@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Music Box</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='3' fill='%23ffcc44'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0a0a12;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #ui{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10}
+    .btn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:6px 16px;border-radius:12px;cursor:pointer;font-size:11px;transition:all .2s;backdrop-filter:blur(6px)}
+    .btn:hover{background:rgba(255,255,255,.1);color:#fff}
+    .btn.active{background:rgba(255,200,100,.15);border-color:rgba(255,200,100,.3);color:#fff}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.3);font-size:11px;letter-spacing:2px;pointer-events:none;z-index:10}
+    #bpm{position:fixed;top:16px;right:16px;color:rgba(255,255,255,.3);font-size:10px;z-index:10;display:flex;align-items:center;gap:6px}
+    #bpm input{width:80px;accent-color:#ffcc44}
+    #scale{position:fixed;top:16px;left:16px;color:rgba(255,255,255,.3);font-size:10px;z-index:10}
+    #playhead{position:fixed;top:0;width:2px;height:100%;background:rgba(255,200,100,.15);z-index:5;pointer-events:none;transition:left .05s linear}
+    #title{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.04);font-size:80px;font-weight:100;letter-spacing:15px;pointer-events:none;z-index:1}
+  </style>
+</head>
+<body>
+<div id="title">MUSIC BOX</div>
+<div id="info">CLICK TO PLACE STARS · THEY BECOME NOTES</div>
+<div id="playhead"></div>
+<div id="bpm">BPM <input type="range" id="bpmSlider" min="40" max="200" value="80"><span id="bpmVal">80</span></div>
+<div id="scale">
+  <select id="scaleSelect" style="background:rgba(0,0,0,.5);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:2px 6px;font-size:10px">
+    <option value="minor">Minor</option>
+    <option value="major">Major</option>
+    <option value="pentatonic">Pentatonic</option>
+    <option value="dorian">Dorian</option>
+    <option value="blues">Blues</option>
+  </select>
+</div>
+<div id="ui">
+  <button class="btn active" id="btnPlay" onclick="togglePlay()">Play</button>
+  <button class="btn" onclick="clearStars()">Clear</button>
+  <button class="btn" onclick="randomize()">Random</button>
+  <button class="btn" onclick="exportMidi()">Export</button>
+</div>
+<canvas id="c"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// Audio
+let aC=null,mG=null;
+function initAudio(){
+  aC=new(AudioContext||webkitAudioContext)();
+  mG=aC.createGain();mG.gain.value=.15;
+  // Reverb
+  const cv=aC.createConvolver(),r=aC.sampleRate,l=r*2,im=aC.createBuffer(2,l,r);
+  for(let c=0;c<2;c++){const d=im.getChannelData(c);for(let i=0;i<l;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/l,2);}
+  cv.buffer=im;const rg=aC.createGain();rg.gain.value=.3;
+  mG.connect(aC.destination);mG.connect(cv);cv.connect(rg);rg.connect(aC.destination);}
+
+const SCALES={
+  minor:[0,2,3,5,7,8,10],major:[0,2,4,5,7,9,11],
+  pentatonic:[0,2,4,7,9],dorian:[0,2,3,5,7,9,10],
+  blues:[0,3,5,6,7,10]};
+
+// Stars
+let stars=[],playing=false,playPos=0,bpm=80,lastBeat=0;
+
+class MusicStar{
+  constructor(x,y){this.x=x;this.y=y;this.sz=3+Math.random()*3;this.hue=Math.random()*360;
+    this.glow=0;this.trail=[];this.vx=(Math.random()-.5)*.2;this.vy=(Math.random()-.5)*.2;}
+  getNoteInfo(){
+    const col=Math.floor(this.x/W*16);// 16 columns = 16 beats
+    const row=1-this.y/H;// 0=bottom, 1=top
+    const scale=SCALES[$('scaleSelect').value]||SCALES.minor;
+    const noteRange=24;// 2 octaves
+    const noteIdx=Math.floor(row*noteRange);
+    const scaleNote=scale[noteIdx%scale.length]+Math.floor(noteIdx/scale.length)*12;
+    return{col,note:48+scaleNote,vel:.3+row*.7};}// base note C3
+  play(){
+    if(!aC)initAudio();
+    const{note,vel}=this.getNoteInfo();
+    const freq=440*Math.pow(2,(note-69)/12);
+    // Bell-like tone
+    const harmonics=[1,2.76,5.4];
+    for(let i=0;i<harmonics.length;i++){
+      const o=aC.createOscillator(),g=aC.createGain();
+      o.type='sine';o.frequency.value=freq*harmonics[i];
+      const v=vel*.08/(i+1);
+      g.gain.setValueAtTime(v,aC.currentTime);
+      g.gain.exponentialRampToValueAtTime(.0001,aC.currentTime+1.5-i*.3);
+      o.connect(g);g.connect(mG);o.start();o.stop(aC.currentTime+1.5);}
+    this.glow=1;}
+  update(){
+    this.glow*=.95;
+    this.x+=this.vx;this.y+=this.vy;
+    // Gentle float
+    this.vx+=(Math.random()-.5)*.01;this.vy+=(Math.random()-.5)*.01;
+    this.vx*=.99;this.vy*=.99;
+    // Bounce
+    if(this.x<0||this.x>W)this.vx*=-1;
+    if(this.y<0||this.y>H)this.vy*=-1;
+    this.trail.push({x:this.x,y:this.y});if(this.trail.length>20)this.trail.shift();}
+  draw(c){
+    // Trail
+    for(let i=1;i<this.trail.length;i++){
+      c.globalAlpha=(i/this.trail.length)*.05;c.strokeStyle=`hsl(${this.hue},60%,60%)`;
+      c.lineWidth=.5;c.beginPath();c.moveTo(this.trail[i-1].x,this.trail[i-1].y);
+      c.lineTo(this.trail[i].x,this.trail[i].y);c.stroke();}
+    // Glow
+    c.globalAlpha=.06+this.glow*.2;
+    c.fillStyle=`hsl(${this.hue},60%,60%)`;c.beginPath();
+    c.arc(this.x,this.y,this.sz*6+this.glow*20,0,Math.PI*2);c.fill();
+    // Core
+    c.globalAlpha=.7+this.glow*.3;c.fillStyle='#fff';c.beginPath();
+    c.arc(this.x,this.y,this.sz+this.glow*3,0,Math.PI*2);c.fill();
+    // Diffraction
+    if(this.sz>4||this.glow>.3){c.globalAlpha=(.1+this.glow*.15);c.strokeStyle=`hsl(${this.hue},50%,70%)`;c.lineWidth=.5;
+      for(let i=0;i<4;i++){const a=i*Math.PI/4;const l=this.sz*4+this.glow*15;
+        c.beginPath();c.moveTo(this.x-Math.cos(a)*l,this.y-Math.sin(a)*l);c.lineTo(this.x+Math.cos(a)*l,this.y+Math.sin(a)*l);c.stroke();}}
+    c.globalAlpha=1;}}
+
+// Input
+C.addEventListener('click',e=>{if(!aC)initAudio();
+  const s=new MusicStar(e.clientX,e.clientY);stars.push(s);s.play();});
+C.addEventListener('contextmenu',e=>{e.preventDefault();
+  // Remove nearest star
+  let best=-1,bd=900;
+  for(let i=0;i<stars.length;i++){const dx=stars[i].x-e.clientX,dy=stars[i].y-e.clientY;
+    if(dx*dx+dy*dy<bd){bd=dx*dx+dy*dy;best=i;}}
+  if(best>=0)stars.splice(best,1);});
+
+$('bpmSlider').oninput=function(){bpm=+this.value;$('bpmVal').textContent=bpm;};
+function $(id){return document.getElementById(id);}
+
+function togglePlay(){playing=!playing;$('btnPlay').classList.toggle('active',playing);$('btnPlay').textContent=playing?'Pause':'Play';}
+function clearStars(){stars=[];}
+function randomize(){clearStars();const n=12+Math.random()*20|0;
+  for(let i=0;i<n;i++)stars.push(new MusicStar(Math.random()*W,Math.random()*H));}
+function exportMidi(){
+  const notes=stars.map(s=>{const info=s.getNoteInfo();return{beat:info.col,note:info.note,vel:info.vel};});
+  navigator.clipboard.writeText(JSON.stringify(notes,null,1)).then(()=>alert('Note data copied to clipboard!')).catch(()=>{});}
+
+// Grid
+function drawGrid(c){
+  c.strokeStyle='rgba(255,255,255,.02)';c.lineWidth=1;
+  // Vertical beat lines
+  for(let i=0;i<=16;i++){const x=i*W/16;c.beginPath();c.moveTo(x,0);c.lineTo(x,H);c.stroke();
+    if(i%4===0){c.strokeStyle='rgba(255,255,255,.04)';c.beginPath();c.moveTo(x,0);c.lineTo(x,H);c.stroke();c.strokeStyle='rgba(255,255,255,.02)';}}
+  // Horizontal note lines
+  const scale=SCALES[$('scaleSelect').value]||SCALES.minor;
+  for(let i=0;i<24;i++){const y=H-i*H/24;
+    const isRoot=scale.includes(i%12)&&i%12===0;
+    c.strokeStyle=isRoot?'rgba(255,200,100,.06)':'rgba(255,255,255,.015)';
+    c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke();}}
+
+// Background stars
+const bgStars=Array.from({length:200},()=>({x:Math.random()*2e3,y:Math.random()*2e3,s:Math.random(),p:Math.random()*Math.PI*2}));
+
+// Render
+function anim(){requestAnimationFrame(anim);
+  X.fillStyle='rgba(10,10,18,.15)';X.fillRect(0,0,W,H);
+  // BG
+  for(const s of bgStars){s.p+=.008;X.globalAlpha=.08+Math.sin(s.p)*.05;X.fillStyle='#fff';
+    X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
+  X.globalAlpha=1;
+  drawGrid(X);
+  // Playhead
+  if(playing){const now=performance.now();const beatInterval=60000/bpm/4;// 16th notes
+    if(now-lastBeat>beatInterval){lastBeat=now;playPos=(playPos+1)%16;
+      // Trigger stars in this column
+      for(const s of stars){const info=s.getNoteInfo();if(info.col===playPos)s.play();}}
+    const ph=$('playhead');ph.style.left=(playPos/16*100)+'%';}
+  // Stars
+  for(const s of stars){s.update();s.draw(X);}
+  // Star count
+  $('info').textContent=stars.length?stars.length+' STARS · '+$('scaleSelect').value.toUpperCase():'CLICK TO PLACE STARS · THEY BECOME NOTES';}
+anim();
+</script>
+</body>
+</html>
