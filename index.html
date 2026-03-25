@@ -340,6 +340,7 @@
   <button class="b" onclick="exportTimelapse()">Timelapse</button>
   <button class="b" onclick="generatePoster()">Poster</button>
   <button class="b" onclick="generateCosmicArt()">Art</button>
+  <button class="b" onclick="generateWallpaper()">Wallpaper</button>
   <button class="b" onclick="extractPalette()">Palette</button>
   <button class="b" onclick="exportPainting()">Painting</button>
   <button class="b" onclick="showCodex()">Codex<kbd>F1</kbd></button>
@@ -1826,6 +1827,7 @@ ACH_DEFS.push(
   {id:'screensaver',name:'AMBIENT',desc:'Activated screensaver mode'},
   {id:'student',name:'QUICK LEARNER',desc:'Completed the tutorial'},
   {id:'diarist',name:'DIARIST',desc:'Read the universe\'s journal'},
+  {id:'wallpaper',name:'DESKTOP COSMOS',desc:'Generated a wallpaper'},
 );
 
 // ═══ INTERSTELLAR SHIPS ═══
@@ -3236,6 +3238,52 @@ function drawCursorTrail(c){
     const t=i/cursorTrail.length;c.globalAlpha=t*.04;c.strokeStyle=th.ac;c.lineWidth=t*2;
     c.beginPath();c.moveTo(cursorTrail[i-1].x,cursorTrail[i-1].y);c.lineTo(cursorTrail[i].x,cursorTrail[i].y);c.stroke();}
   c.globalAlpha=1;}
+
+// ═══ WALLPAPER GENERATOR ═══
+function generateWallpaper(){
+  const res=prompt('Resolution:\\n1) 1920x1080 (Desktop 16:9)\\n2) 2560x1440 (QHD)\\n3) 3840x2160 (4K)\\n4) 1080x1920 (Phone)\\n5) 2560x1080 (Ultrawide)');
+  const sizes={1:[1920,1080],2:[2560,1440],3:[3840,2160],4:[1080,1920],5:[2560,1080]};
+  const[ww,hh]=sizes[+res]||sizes[1];
+  const wc=document.createElement('canvas');wc.width=ww;wc.height=hh;
+  const wx=wc.getContext('2d');
+  // Background
+  const bg=wx.createLinearGradient(0,0,0,hh);
+  bg.addColorStop(0,`rgb(${th.bg[0]},${th.bg[1]},${th.bg[2]})`);
+  bg.addColorStop(.5,`rgb(${th.bg[0]+3},${th.bg[1]+2},${th.bg[2]+5})`);
+  bg.addColorStop(1,`rgb(${th.bg[0]},${th.bg[1]},${th.bg[2]})`);
+  wx.fillStyle=bg;wx.fillRect(0,0,ww,hh);
+  // Render nebula
+  for(let i=0;i<8;i++){const cx=Math.random()*ww,cy=Math.random()*hh,r=200+Math.random()*400;
+    const g=wx.createRadialGradient(cx,cy,0,cx,cy,r);
+    g.addColorStop(0,`rgba(${th.nb[i%th.nb.length]},.04)`);g.addColorStop(1,'rgba(0,0,0,0)');
+    wx.fillStyle=g;wx.beginPath();wx.arc(cx,cy,r,0,Math.PI*2);wx.fill();}
+  // Stars from simulation (scaled to wallpaper)
+  const sx=ww/W,sy=hh/H;
+  for(const p of P){const px=p.x*sx,py=p.y*sy;
+    wx.globalAlpha=.08;wx.fillStyle=p.col;wx.beginPath();wx.arc(px,py,p.sz*sx*p.glowF,0,Math.PI*2);wx.fill();
+    wx.globalAlpha=.85;wx.fillStyle='#fff';wx.beginPath();wx.arc(px,py,Math.max(1,p.sz*sx),0,Math.PI*2);wx.fill();
+    // Diffraction spikes for big stars
+    if(p.sz>2){wx.globalAlpha=.1;wx.strokeStyle=p.col;wx.lineWidth=.5;
+      for(let j=0;j<4;j++){const a=j*Math.PI/4;const sl=p.sz*sx*p.glowF;
+        wx.beginPath();wx.moveTo(px-Math.cos(a)*sl,py-Math.sin(a)*sl);wx.lineTo(px+Math.cos(a)*sl,py+Math.sin(a)*sl);wx.stroke();}}}
+  // Black holes
+  for(const bh of BH){const bx=bh.x*sx,by=bh.y*sy;
+    const g=wx.createRadialGradient(bx,by,0,bx,by,bh.eh*sx*2);
+    g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.5,`rgba(${th.nb[0]},.08)`);g.addColorStop(1,'rgba(0,0,0,0)');
+    wx.globalAlpha=1;wx.fillStyle=g;wx.beginPath();wx.arc(bx,by,bh.eh*sx*2,0,Math.PI*2);wx.fill();}
+  // Background stars
+  for(let i=0;i<500;i++){wx.globalAlpha=Math.random()*.2;wx.fillStyle='#fff';
+    wx.beginPath();wx.arc(Math.random()*ww,Math.random()*hh,Math.random()*1.5,0,Math.PI*2);wx.fill();}
+  // Subtle vignette
+  const vg=wx.createRadialGradient(ww/2,hh/2,Math.min(ww,hh)*.3,ww/2,hh/2,Math.max(ww,hh)*.7);
+  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.3)');
+  wx.globalAlpha=1;wx.fillStyle=vg;wx.fillRect(0,0,ww,hh);
+  // Export
+  const link=document.createElement('a');link.download=`cosmos_wallpaper_${ww}x${hh}.png`;
+  link.href=wc.toDataURL('image/png');link.click();
+  toast(ww+'x'+hh+' WALLPAPER');
+  unlockAch({id:'wallpaper',name:'DESKTOP COSMOS',desc:'Generated a wallpaper'});}
+window.generateWallpaper=generateWallpaper;
 
 // ═══ COLOR PALETTE EXTRACTOR ═══
 function extractPalette(){
