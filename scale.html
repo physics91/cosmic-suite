@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Scale</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='10' fill='none' stroke='%23fff' stroke-width='.3' opacity='.3'/><circle cx='16' cy='16' r='5' fill='none' stroke='%23fff' stroke-width='.3' opacity='.4'/><circle cx='16' cy='16' r='1.5' fill='%23fff'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#050508;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block;position:fixed;top:0;left:0}
+    #label{position:fixed;top:50%;left:50%;transform:translate(-50%,-60%);text-align:center;z-index:2;pointer-events:none;transition:opacity .5s}
+    #label h1{color:rgba(255,255,255,.7);font-weight:200;font-size:min(6vw,32px);letter-spacing:4px;margin-bottom:6px}
+    #label .sz{color:rgba(255,255,255,.25);font-size:12px;letter-spacing:2px;font-family:monospace}
+    #label .desc{color:rgba(255,255,255,.2);font-size:11px;margin-top:8px;max-width:400px;line-height:1.6}
+    #scaleBar{position:fixed;right:20px;top:50%;transform:translateY(-50%);width:4px;height:60vh;background:rgba(255,255,255,.03);border-radius:2px;z-index:2}
+    #scalePos{width:4px;height:12px;background:rgba(255,255,255,.3);border-radius:2px;position:absolute;transition:top .3s}
+    #hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:10px;letter-spacing:2px;z-index:2}
+    #power{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:20px;font-weight:200;letter-spacing:2px;z-index:2;font-family:monospace}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="label"><h1 id="name">HUMAN</h1><div class="sz" id="size">~1.7 m</div><div class="desc" id="desc">You are here. Everything else is relative to you.</div></div>
+<div id="scaleBar"><div id="scalePos"></div></div>
+<div id="power">10<sup>0</sup> m</div>
+<div id="hint">SCROLL TO ZOOM THROUGH 40 ORDERS OF MAGNITUDE</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// Scale objects: [power of 10 in meters, name, size string, description, color, visual]
+const OBJECTS=[
+  [-15,'QUARK','~10⁻¹⁵ m','The smallest known particle. A point of energy and charge.','#ff4444','dot'],
+  [-14,'PROTON','~10⁻¹⁴ m','Made of 3 quarks bound by the strong force.','#ff6644','circle'],
+  [-10,'ATOM','~10⁻¹⁰ m','An electron cloud around a nucleus. The building block of matter.','#4488ff','rings'],
+  [-9,'DNA','~2×10⁻⁹ m','The molecule that encodes life. A double helix of 3 billion base pairs.','#44ff88','helix'],
+  [-6,'CELL','~10⁻⁵ m','The smallest unit of life. You contain 37 trillion of them.','#88ff44','blob'],
+  [-3,'ANT','~3×10⁻³ m','A tiny organism with a brain of 250,000 neurons.','#ffaa44','dot'],
+  [0,'HUMAN','~1.7 m','You are here. Everything else is relative to you.','#ffffff','figure'],
+  [1,'WHALE','~30 m','The largest animal ever to live. Its heart is the size of a car.','#6688cc','oval'],
+  [3,'MOUNTAIN','~10³ m','Everest rises 8,849m above sea level. A wrinkle on Earth\'s surface.','#886644','triangle'],
+  [6,'EARTH','~10⁷ m','Pale blue dot. 8 billion humans. One fragile atmosphere.','#4488ff','planet'],
+  [8,'JUPITER','~10⁸ m','1,300 Earths could fit inside. The Great Red Spot is larger than Earth.','#cc8844','planet'],
+  [9,'SUN','~10⁹ m','A yellow dwarf star. 99.86% of the solar system\'s mass.','#ffcc44','star'],
+  [11,'EARTH ORBIT','~10¹¹ m','The distance Earth travels around the Sun in one year.','#448844','orbit'],
+  [13,'SOLAR SYSTEM','~10¹³ m','8 planets, 200+ moons, millions of asteroids and comets.','#886644','orbits'],
+  [16,'LIGHT YEAR','~10¹⁶ m','The distance light travels in one year: 9.46 trillion km.','#aaccff','beam'],
+  [17,'NEAREST STAR','~4×10¹⁶ m','Proxima Centauri. 4.24 light years away. The nearest other sun.','#ffaa88','star'],
+  [20,'NEBULA','~10²⁰ m','A stellar nursery. Gas and dust where new stars are born.','#8844cc','nebula'],
+  [21,'MILKY WAY','~10²¹ m','Our galaxy. 200 billion stars. You are 26,000 light years from the center.','#aabbcc','galaxy'],
+  [23,'GALAXY GROUP','~10²³ m','The Local Group. ~80 galaxies bound by gravity.','#8888aa','dots'],
+  [25,'SUPERCLUSTER','~10²⁵ m','Laniakea. 100,000 galaxies flowing toward the Great Attractor.','#666688','web'],
+  [26,'OBSERVABLE UNIVERSE','~10²⁶ m','93 billion light years across. 2 trillion galaxies. Everything we can see.','#444466','sphere'],
+];
+
+let currentPower=0,targetPower=0;
+
+addEventListener('wheel',e=>{e.preventDefault();targetPower+=e.deltaY>0?1:-1;
+  targetPower=Math.max(-15,Math.min(26,targetPower));},{passive:false});
+
+// Touch
+let lastTouchY=0;
+addEventListener('touchstart',e=>{lastTouchY=e.touches[0].clientY;});
+addEventListener('touchmove',e=>{e.preventDefault();const dy=lastTouchY-e.touches[0].clientY;
+  targetPower+=dy*.02;targetPower=Math.max(-15,Math.min(26,targetPower));lastTouchY=e.touches[0].clientY;},{passive:false});
+
+function getCurrentObject(){
+  let best=OBJECTS[0],bd=Infinity;
+  for(const o of OBJECTS){const d=Math.abs(currentPower-o[0]);if(d<bd){bd=d;best=o;}}
+  return best;}
+
+function anim(){requestAnimationFrame(anim);
+  currentPower+=(targetPower-currentPower)*.08;
+  X.fillStyle='rgba(5,5,8,.15)';X.fillRect(0,0,W,H);
+  const obj=getCurrentObject();const cx=W/2,cy=H/2;
+  const proximity=1-Math.min(1,Math.abs(currentPower-obj[0])/3);
+
+  // Visual based on type
+  const r=40+proximity*60;const col=obj[4];
+  X.globalAlpha=proximity*.15;
+  if(obj[5]==='dot'){X.fillStyle=col;X.beginPath();X.arc(cx,cy,r*.3,0,Math.PI*2);X.fill();}
+  else if(obj[5]==='circle'){X.strokeStyle=col;X.lineWidth=2;X.beginPath();X.arc(cx,cy,r,0,Math.PI*2);X.stroke();}
+  else if(obj[5]==='rings'){for(let i=0;i<3;i++){X.strokeStyle=col;X.lineWidth=.5;X.globalAlpha=proximity*(.08-i*.02);X.beginPath();X.arc(cx,cy,r*(1+i*.5),0,Math.PI*2);X.stroke();}X.globalAlpha=proximity*.2;X.fillStyle=col;X.beginPath();X.arc(cx,cy,r*.15,0,Math.PI*2);X.fill();}
+  else if(obj[5]==='helix'){X.strokeStyle=col;X.lineWidth=1;X.beginPath();for(let t=0;t<Math.PI*6;t+=.1){X.lineTo(cx+Math.sin(t)*r*.3,cy-r+t/(Math.PI*6)*r*2);}X.stroke();}
+  else if(obj[5]==='blob'){X.fillStyle=col;X.beginPath();for(let a=0;a<Math.PI*2;a+=.2){const br=r*(.7+Math.sin(a*3+Date.now()*.002)*.3);X.lineTo(cx+Math.cos(a)*br,cy+Math.sin(a)*br);}X.fill();}
+  else if(obj[5]==='figure'){X.strokeStyle=col;X.lineWidth=1.5;X.beginPath();X.arc(cx,cy-r*.5,r*.15,0,Math.PI*2);X.stroke();X.beginPath();X.moveTo(cx,cy-r*.35);X.lineTo(cx,cy+r*.2);X.moveTo(cx-r*.2,cy-r*.1);X.lineTo(cx+r*.2,cy-r*.1);X.moveTo(cx,cy+r*.2);X.lineTo(cx-r*.15,cy+r*.5);X.moveTo(cx,cy+r*.2);X.lineTo(cx+r*.15,cy+r*.5);X.stroke();}
+  else if(obj[5]==='planet'){const g=X.createRadialGradient(cx-r*.2,cy-r*.2,0,cx,cy,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,.5)');X.fillStyle=g;X.beginPath();X.arc(cx,cy,r,0,Math.PI*2);X.fill();}
+  else if(obj[5]==='star'){X.fillStyle=col;X.beginPath();X.arc(cx,cy,r,0,Math.PI*2);X.fill();X.globalAlpha=proximity*.05;X.beginPath();X.arc(cx,cy,r*2,0,Math.PI*2);X.fill();}
+  else if(obj[5]==='orbit'){X.strokeStyle=col;X.lineWidth=.5;X.beginPath();X.arc(cx,cy,r*1.5,0,Math.PI*2);X.stroke();X.fillStyle='#4488ff';X.globalAlpha=proximity*.3;X.beginPath();X.arc(cx+r*1.5,cy,4,0,Math.PI*2);X.fill();}
+  else if(obj[5]==='orbits'){for(let i=0;i<5;i++){X.strokeStyle=col;X.lineWidth=.3;X.globalAlpha=proximity*(.05-i*.008);X.beginPath();X.arc(cx,cy,r*(.5+i*.4),0,Math.PI*2);X.stroke();}}
+  else if(obj[5]==='beam'){X.strokeStyle=col;X.lineWidth=1;X.globalAlpha=proximity*.1;X.beginPath();X.moveTo(cx-r*2,cy);X.lineTo(cx+r*2,cy);X.stroke();}
+  else if(obj[5]==='nebula'){for(let i=0;i<4;i++){const g=X.createRadialGradient(cx+(i-2)*20,cy+(i-1)*15,0,cx,cy,r*(1+i*.3));g.addColorStop(0,col+'30');g.addColorStop(1,'rgba(0,0,0,0)');X.fillStyle=g;X.globalAlpha=proximity*.06;X.beginPath();X.arc(cx+(i-2)*20,cy+(i-1)*15,r*(1+i*.3),0,Math.PI*2);X.fill();}}
+  else if(obj[5]==='galaxy'){X.strokeStyle=col;X.lineWidth=.5;X.globalAlpha=proximity*.1;for(let arm=0;arm<3;arm++){X.beginPath();for(let t=0;t<Math.PI*4;t+=.1){const sr=t*r/(Math.PI*4);X.lineTo(cx+Math.cos(t+arm*Math.PI*2/3)*sr,cy+Math.sin(t+arm*Math.PI*2/3)*sr*.6);}X.stroke();}}
+  else if(obj[5]==='dots'){for(let i=0;i<30;i++){X.globalAlpha=proximity*.1;X.fillStyle=col;X.beginPath();X.arc(cx+(Math.sin(i*7.3)-.5)*r*3,(cy+(Math.cos(i*11.7)-.5)*r*2),2,0,Math.PI*2);X.fill();}}
+  else if(obj[5]==='web'){X.strokeStyle=col;X.lineWidth=.3;X.globalAlpha=proximity*.04;for(let i=0;i<20;i++){X.beginPath();X.moveTo(cx+Math.sin(i*3.7)*r*2,cy+Math.cos(i*5.3)*r*2);X.lineTo(cx+Math.sin(i*3.7+1)*r*2,cy+Math.cos(i*5.3+1)*r*2);X.stroke();}}
+  else if(obj[5]==='sphere'){X.strokeStyle=col;X.lineWidth=.5;X.globalAlpha=proximity*.06;X.beginPath();X.arc(cx,cy,r*2,0,Math.PI*2);X.stroke();X.beginPath();X.ellipse(cx,cy,r*2,r*.6,0,0,Math.PI*2);X.stroke();}
+
+  X.globalAlpha=1;
+  // Scale indicator particles
+  const scale=Math.pow(10,currentPower);
+  for(let i=0;i<8;i++){const a=i*Math.PI/4+Date.now()*.0003;const dr=r*1.8+Math.sin(Date.now()*.001+i)*10;
+    X.globalAlpha=.03;X.fillStyle='#fff';X.beginPath();X.arc(cx+Math.cos(a)*dr,cy+Math.sin(a)*dr,1,0,Math.PI*2);X.fill();}
+
+  // Update labels
+  document.getElementById('name').textContent=obj[1];
+  document.getElementById('size').textContent=obj[2];
+  document.getElementById('desc').textContent=obj[3];
+  document.getElementById('label').style.opacity=proximity>.3?'1':'0';
+  document.getElementById('power').textContent='10'+formatSup(Math.round(currentPower))+' m';
+  // Scale bar position
+  const barPos=((currentPower+15)/41)*100;
+  document.getElementById('scalePos').style.top=barPos+'%';}
+
+function formatSup(n){const sups='⁰¹²³⁴⁵⁶⁷⁸⁹';const neg=n<0;const abs=Math.abs(n);
+  let s=neg?'⁻':'';for(const c of ''+abs)s+=sups[+c];return s;}
+
+anim();
+</script>
+</body>
+</html>
