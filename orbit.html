@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orbit Runner</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='6' fill='none' stroke='%2344aaff' stroke-width='1'/><circle cx='22' cy='16' r='2' fill='%2344aaff'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#060610;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:pointer}
+    canvas{display:block}
+    #score{position:fixed;top:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font-size:28px;font-weight:200;letter-spacing:4px;z-index:2;pointer-events:none}
+    #msg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.6);font-size:16px;font-weight:200;letter-spacing:4px;text-align:center;z-index:2;pointer-events:none;line-height:2.5}
+    #best{position:fixed;top:50px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:10px;letter-spacing:2px;z-index:2;pointer-events:none}
+    #hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:10px;letter-spacing:1px;z-index:2;pointer-events:none}
+  </style>
+</head>
+<body>
+<div id="score">0</div>
+<div id="best"></div>
+<div id="msg">ORBIT RUNNER<br><span style="font-size:10px;opacity:.5">CLICK OR TAP TO BOOST<br>STAY IN ORBIT · DON'T CRASH · DON'T DRIFT</span></div>
+<div id="hint">click anywhere to start</div>
+<canvas id="c"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// Game state
+let state='menu',score=0,bestScore=+(localStorage.getItem('orbit_best')||0),level=1;
+let ship={x:0,y:0,vx:0,vy:0,trail:[],alive:true,fuel:100};
+let stars=[],collectibles=[],particles=[];
+let shakeAmt=0,slowmo=1;
+
+document.getElementById('best').textContent=bestScore?'BEST: '+bestScore:'';
+
+function startGame(){
+  state='play';score=0;level=1;ship.alive=true;ship.fuel=100;particles=[];
+  ship.trail=[];collectibles=[];
+  // Place central star
+  stars=[{x:W/2,y:H/2,mass:300,r:25,color:'#ffcc44'}];
+  // Start ship in orbit
+  const orbitR=150;ship.x=W/2+orbitR;ship.y=H/2;
+  ship.vx=0;ship.vy=Math.sqrt(stars[0].mass/orbitR)*1.1;// orbital velocity
+  document.getElementById('msg').textContent='';
+  document.getElementById('hint').textContent='click to boost outward';}
+
+function gameOver(reason){
+  state='dead';
+  if(score>bestScore){bestScore=score;localStorage.setItem('orbit_best',''+bestScore);}
+  document.getElementById('msg').textContent='ORBIT LOST\n'+reason+'\nSCORE: '+score+(score>=bestScore&&score>0?'\nNEW BEST!':'')+'\n\nclick to retry';
+  document.getElementById('best').textContent='BEST: '+bestScore;shakeAmt=15;}
+
+function spawnCollectible(){
+  const star=stars[0];const angle=Math.random()*Math.PI*2;const dist=80+Math.random()*200;
+  collectibles.push({x:star.x+Math.cos(angle)*dist,y:star.y+Math.sin(angle)*dist,sz:4,collected:false,glow:0});}
+
+function addStar(){
+  const angle=Math.random()*Math.PI*2;const dist=250+Math.random()*150;
+  stars.push({x:W/2+Math.cos(angle)*dist,y:W/2+Math.sin(angle)*dist,mass:100+Math.random()*100,r:15,color:['#ff6644','#44aaff','#44ff88'][(stars.length-1)%3]});}
+
+// Input
+let boosting=false;
+addEventListener('mousedown',()=>{
+  if(state==='menu'||state==='dead'){startGame();return;}
+  boosting=true;});
+addEventListener('mouseup',()=>boosting=false);
+addEventListener('touchstart',e=>{e.preventDefault();
+  if(state==='menu'||state==='dead'){startGame();return;}
+  boosting=true;});
+addEventListener('touchend',()=>boosting=false);
+
+// Background stars
+const bgStars=Array.from({length:150},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random()*1.5,p:Math.random()*Math.PI*2}));
+
+function update(){
+  if(state!=='play')return;
+  const dt=slowmo;
+  // Gravity from all stars
+  for(const star of stars){
+    const dx=star.x-ship.x,dy=star.y-ship.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<star.r+3){gameOver('CRASHED INTO STAR');return;}
+    const f=star.mass/(dist*dist);
+    ship.vx+=(dx/dist)*f*dt;ship.vy+=(dy/dist)*f*dt;}
+  // Boost — push away from nearest star
+  if(boosting&&ship.fuel>0){
+    ship.fuel=Math.max(0,ship.fuel-.3);
+    const ns=stars[0];const dx=ship.x-ns.x,dy=ship.y-ns.y,d=Math.sqrt(dx*dx+dy*dy)+1;
+    ship.vx+=(dx/d)*.15*dt;ship.vy+=(dy/d)*.15*dt;
+    // Boost particles
+    if(Math.random()<.5)particles.push({x:ship.x,y:ship.y,vx:-(dx/d)*2+Math.random()-.5,vy:-(dy/d)*2+Math.random()-.5,life:20,color:'#44aaff'});}
+  // Fuel regen when not boosting
+  if(!boosting)ship.fuel=Math.min(100,ship.fuel+.05);
+  // Move
+  ship.x+=ship.vx*dt;ship.y+=ship.vy*dt;
+  ship.trail.push({x:ship.x,y:ship.y});if(ship.trail.length>60)ship.trail.shift();
+  // Out of bounds check
+  if(ship.x<-100||ship.x>W+100||ship.y<-100||ship.y>H+100){gameOver('DRIFTED INTO THE VOID');return;}
+  // Collectibles
+  for(const c of collectibles){if(c.collected)continue;
+    const dx=c.x-ship.x,dy=c.y-ship.y;
+    if(dx*dx+dy*dy<(c.sz+5)*(c.sz+5)){c.collected=true;c.glow=1;score++;
+      // Burst particles
+      for(let i=0;i<8;i++){const a=i*Math.PI/4;particles.push({x:c.x,y:c.y,vx:Math.cos(a)*3,vy:Math.sin(a)*3,life:20,color:'#ffcc44'});}
+      // Level up
+      if(score%5===0){level++;spawnCollectible();if(score%10===0)addStar();}}}
+  // Remove collected, spawn new
+  collectibles=collectibles.filter(c=>!c.collected);
+  if(collectibles.length<3)spawnCollectible();
+  // Particles
+  for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life--;p.vx*=.95;p.vy*=.95;}
+  particles=particles.filter(p=>p.life>0);
+  // Score ticks up over time
+  if(Math.random()<.02)score++;
+  // Shake decay
+  if(shakeAmt>0)shakeAmt*=.9;}
+
+function render(){requestAnimationFrame(render);
+  update();
+  const sx=shakeAmt>0?(Math.random()-.5)*shakeAmt:0;
+  const sy=shakeAmt>0?(Math.random()-.5)*shakeAmt:0;
+  X.save();X.translate(sx,sy);
+  X.fillStyle='rgba(6,6,16,.2)';X.fillRect(0,0,W,H);
+  // BG stars
+  for(const s of bgStars){s.p+=.004;X.globalAlpha=.06+Math.sin(s.p)*.04;X.fillStyle='#fff';
+    X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
+  if(state==='menu'){X.restore();return;}
+  // Stars
+  for(const star of stars){
+    // Glow
+    X.globalAlpha=.06;const g=X.createRadialGradient(star.x,star.y,0,star.x,star.y,star.r*4);
+    g.addColorStop(0,star.color);g.addColorStop(1,'rgba(0,0,0,0)');X.fillStyle=g;
+    X.beginPath();X.arc(star.x,star.y,star.r*4,0,Math.PI*2);X.fill();
+    // Core
+    X.globalAlpha=.8;X.fillStyle=star.color;X.beginPath();X.arc(star.x,star.y,star.r,0,Math.PI*2);X.fill();
+    // Danger zone
+    X.globalAlpha=.02;X.strokeStyle='#ff4444';X.lineWidth=1;
+    X.beginPath();X.arc(star.x,star.y,star.r+15,0,Math.PI*2);X.stroke();}
+  // Collectibles
+  for(const c of collectibles){if(c.collected)continue;
+    X.globalAlpha=.15;X.fillStyle='#ffcc44';X.beginPath();X.arc(c.x,c.y,c.sz*3,0,Math.PI*2);X.fill();
+    X.globalAlpha=.7;X.beginPath();X.arc(c.x,c.y,c.sz,0,Math.PI*2);X.fill();}
+  // Ship trail
+  for(let i=1;i<ship.trail.length;i++){const t=i/ship.trail.length;
+    X.globalAlpha=t*.15;X.strokeStyle='#44aaff';X.lineWidth=t*2;
+    X.beginPath();X.moveTo(ship.trail[i-1].x,ship.trail[i-1].y);X.lineTo(ship.trail[i].x,ship.trail[i].y);X.stroke();}
+  // Ship
+  if(ship.alive){X.globalAlpha=.2;X.fillStyle='#44aaff';X.beginPath();X.arc(ship.x,ship.y,8,0,Math.PI*2);X.fill();
+    X.globalAlpha=.8;X.fillStyle='#fff';X.beginPath();X.arc(ship.x,ship.y,3,0,Math.PI*2);X.fill();
+    // Fuel bar
+    X.globalAlpha=.15;X.fillStyle='#222';X.fillRect(ship.x-15,ship.y+12,30,3);
+    X.fillStyle=ship.fuel>30?'#44aaff':'#ff4444';X.fillRect(ship.x-15,ship.y+12,ship.fuel/100*30,3);}
+  // Particles
+  for(const p of particles){X.globalAlpha=(p.life/20)*.5;X.fillStyle=p.color;
+    X.beginPath();X.arc(p.x,p.y,1.5,0,Math.PI*2);X.fill();}
+  X.globalAlpha=1;X.restore();
+  document.getElementById('score').textContent=score;
+  document.getElementById('hint').textContent=state==='play'?'LEVEL '+level+(boosting?' · BOOSTING':''):'';}
+render();
+</script>
+</body>
+</html>
