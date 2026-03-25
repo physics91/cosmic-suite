@@ -332,6 +332,7 @@
   <button class="b" onclick="showAchGallery()">Trophies</button>
   <button class="b" onclick="showCredits()">Credits</button>
   <button class="b" onclick="writeStory()">Story</button>
+  <button class="b" onclick="screensaverMode()">Screen Saver</button>
   <button class="b" onclick="toggleZen()">Zen<kbd>Z</kbd></button>
   <button class="b" onclick="showKbOverlay()">Keys<kbd>?</kbd></button>
   <button class="b" onclick="shareUniverse()">Share</button>
@@ -1805,6 +1806,7 @@ ACH_DEFS.push(
   {id:'surface',name:'PALE BLUE DOT',desc:'Saw a planet\'s surface up close'},
   {id:'palette_ach',name:'COLOR THEORIST',desc:'Extracted a color palette'},
   {id:'radio_ach',name:'RADIO ASTRONOMER',desc:'Tuned into cosmic radio'},
+  {id:'screensaver',name:'AMBIENT',desc:'Activated screensaver mode'},
 );
 
 // ═══ INTERSTELLAR SHIPS ═══
@@ -3955,6 +3957,32 @@ function godModePerks(dt){
   for(const p of P)p.fcd=0;
   // Shielded planets are ALL planets
   for(const pl of PL)shieldedPlanets.add(pl);}
+
+// ═══ SCREENSAVER MODE ═══
+function screensaverMode(){
+  // Enable everything for the perfect ambient experience
+  clearAll();
+  // Beautiful starting scene
+  spawnGalaxy();
+  // Enable all visual enhancements
+  if(!fBloom){TG('bloom');}
+  if(!fLife){TG('lifecycle');}
+  if(!fNbody){TG('nbody');}
+  if(!fBirth){TG('birth');}
+  if(!fDm){TG('dm');}
+  // Enable audio
+  if(!aOn)toggleAudio();
+  setRadio(0);// Ambient Void
+  // Enable autopilot + cinema + zen
+  if(!fAuto){TG('auto');}
+  if(!fCinema)toggleCinema();
+  // Speed up slightly
+  tScale=1.5;$('tSlider').value=150;$('tVal').textContent='1.5x';
+  // Enter zen mode last (hides UI)
+  setTimeout(()=>{if(!zenMode)toggleZen();},500);
+  toast('SCREENSAVER');narrate('Sit back. The cosmos will take care of itself.');
+  unlockAch({id:'screensaver',name:'AMBIENT',desc:'Activated screensaver mode'});}
+window.screensaverMode=screensaverMode;
 
 // ═══ ZEN MODE ═══
 function toggleZen(){trackFeature('zen');zenMode=!zenMode;document.body.classList.toggle('zen',zenMode);
