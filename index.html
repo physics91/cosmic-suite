@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='3' fill='%23fff'/><circle cx='16' cy='16' r='8' fill='none' stroke='%236688ff' stroke-width='.5' opacity='.5'/></svg>">
-  <title>Digital Cosmos v62</title>
+  <title>Digital Cosmos</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{background:#000;overflow:hidden;cursor:crosshair;font-family:'Segoe UI',system-ui,sans-serif}
@@ -200,6 +200,10 @@
     #timeline .th{color:rgba(255,255,255,0.3);font-size:7px;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
     #timeline .te{color:rgba(255,255,255,0.35);font-size:7px;line-height:1.7;border-left:1px solid rgba(255,255,255,0.08);padding-left:6px;margin:2px 0}
     #timeline .te .tt{color:rgba(255,255,255,0.2);font-size:6px;margin-right:4px;font-family:monospace}
+    #radio{position:fixed;top:60px;right:12px;z-index:12;display:none}
+    #radio .rs{background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:3px 8px;color:rgba(255,255,255,.35);font-size:8px;cursor:pointer;margin:2px 0;display:block;transition:all .15s;backdrop-filter:blur(4px);text-align:right}
+    #radio .rs:hover{color:#fff;border-color:rgba(255,255,255,.15)}
+    #radio .rs.on{color:rgba(255,200,100,.7);border-color:rgba(255,200,100,.15)}
     #palette{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.92);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:16px 20px;z-index:650;display:none;text-align:center;backdrop-filter:blur(12px)}
     #palette h3{color:#fff;font-weight:200;letter-spacing:3px;font-size:12px;margin-bottom:10px}
     #palette .pal-row{display:flex;gap:4px;justify-content:center;margin:8px 0}
@@ -272,6 +276,7 @@
   <button id="aBtn" onclick="toggleAudio()">Audio OFF</button>
   <button id="mBtn" onclick="toggleMic()">Mic OFF</button>
   <button onclick="playStarMelody()">Play Stars</button>
+  <button onclick="toggleRadio()">Radio</button>
   <button id="cBtn" onclick="toggleCinema()">Cinema OFF</button>
   <div style="display:flex;gap:4px"><button onclick="saveUniverse()">Save</button><button onclick="loadUniverse()">Load</button><button onclick="showSaveSlots()">Slots</button></div>
 </div>
@@ -560,6 +565,13 @@
   <div class="ld"><span class="lc" style="background:#ff8844"></span>Red Giant</div>
   <div class="ld"><span class="lc" style="background:#eeeeff"></span>White Dwarf</div>
   <div class="ld"><span class="lc" style="background:#88ddff"></span>Neutron</div>
+</div>
+<div id="radio">
+  <div class="rs" onclick="setRadio(0)">Ambient Void</div>
+  <div class="rs" onclick="setRadio(1)">Stellar Jazz</div>
+  <div class="rs" onclick="setRadio(2)">Civ Beats</div>
+  <div class="rs" onclick="setRadio(3)">Deep Drone</div>
+  <div class="rs" onclick="setRadio(-1)">OFF</div>
 </div>
 <div id="palette"></div>
 <div id="commentary"><div class="ct2">DEVELOPER COMMENTARY</div><div id="comText"></div></div>
@@ -1220,6 +1232,56 @@ function updatePad(){
   // Filter follows activity
   padOscs._filter.frequency.setTargetAtTime(200+density*400+cosmicMindCoherence*600,t,1);}
 
+// ═══ COSMIC RADIO ═══
+let radioStation=-1,radioTimer2=0,radioVisible=false;
+function toggleRadio(){radioVisible=!radioVisible;$('radio').style.display=radioVisible?'block':'none';
+  if(!aOn&&radioVisible){toggleAudio();}}
+window.toggleRadio=toggleRadio;
+
+function setRadio(ch){radioStation=ch;
+  document.querySelectorAll('#radio .rs').forEach((el,i)=>el.classList.toggle('on',i===ch));
+  if(ch===-1){toast('RADIO OFF');return;}
+  toast(['AMBIENT VOID','STELLAR JAZZ','CIV BEATS','DEEP DRONE'][ch]);
+  unlockAch({id:'radio_ach',name:'RADIO ASTRONOMER',desc:'Tuned into cosmic radio'});}
+window.setRadio=setRadio;
+
+function playRadio(dt){
+  if(radioStation<0||!aOn||!aC)return;
+  radioTimer2+=dt;const interval=[20,8,12,30][radioStation];
+  if(radioTimer2<interval)return;radioTimer2=0;
+  const t=aC.currentTime,sc=SC[th.as]||SC.minor,b=th.ab;
+  if(radioStation===0){// Ambient Void — long sustained tones
+    const o=aC.createOscillator(),g=aC.createGain();o.type='sine';
+    const n=b-12+sc[(Math.random()*sc.length)|0];o.frequency.value=440*Math.pow(2,(n-69)/12);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.012,t+1);g.gain.linearRampToValueAtTime(0,t+4);
+    o.connect(g);g.connect(mG);o.start(t);o.stop(t+4);
+  }else if(radioStation===1){// Stellar Jazz — quick notes, swing feel
+    const notes=[0,4,7,11,14];const n=b+12+sc[notes[(Math.random()*notes.length)|0]%sc.length];
+    const o=aC.createOscillator(),g=aC.createGain();o.type=Math.random()>.5?'triangle':'sine';
+    o.frequency.value=440*Math.pow(2,(n-69)/12);
+    g.gain.setValueAtTime(.02,t);g.gain.exponentialRampToValueAtTime(.001,t+.2+Math.random()*.3);
+    o.connect(g);g.connect(mG);o.start(t);o.stop(t+.5);
+    // Occasional double note (swing)
+    if(Math.random()<.3){const o2=aC.createOscillator(),g2=aC.createGain();o2.type='sine';
+      o2.frequency.value=440*Math.pow(2,((n+sc[(Math.random()*sc.length)|0])-69)/12);
+      g2.gain.setValueAtTime(.01,t+.12);g2.gain.exponentialRampToValueAtTime(.001,t+.35);
+      o2.connect(g2);g2.connect(mG);o2.start(t+.12);o2.stop(t+.4);}
+  }else if(radioStation===2){// Civ Beats — rhythmic pulses
+    const o=aC.createOscillator(),g=aC.createGain();o.type='square';
+    o.frequency.value=80+Math.random()*40;
+    g.gain.setValueAtTime(.015,t);g.gain.exponentialRampToValueAtTime(.001,t+.08);
+    o.connect(g);g.connect(mG);o.start(t);o.stop(t+.1);
+    // Hi-hat like noise burst
+    if(Math.random()<.5){const buf=aC.createBuffer(1,aC.sampleRate*.02,aC.sampleRate);
+      const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*.5;
+      const src=aC.createBufferSource(),g2=aC.createGain();src.buffer=buf;g2.gain.value=.008;
+      src.connect(g2);g2.connect(mG);src.start(t+.06);}
+  }else if(radioStation===3){// Deep Drone — sub-bass oscillations
+    const o=aC.createOscillator(),g=aC.createGain();o.type='sine';
+    o.frequency.value=25+Math.sin(simTime*.001)*10;
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.02,t+2);g.gain.linearRampToValueAtTime(0,t+6);
+    o.connect(g);g.connect(mG);o.start(t);o.stop(t+6);}}
+
 // ═══ PROXIMITY AUDIO ═══
 let proxOsc=null,proxGain=null,proxFilter=null;
 function initProxAudio(){
@@ -1742,6 +1804,7 @@ ACH_DEFS.push(
   {id:'final',name:'THE LAST STAR',desc:'Heard the universe\'s final words'},
   {id:'surface',name:'PALE BLUE DOT',desc:'Saw a planet\'s surface up close'},
   {id:'palette_ach',name:'COLOR THEORIST',desc:'Extracted a color palette'},
+  {id:'radio_ach',name:'RADIO ASTRONOMER',desc:'Tuned into cosmic radio'},
 );
 
 // ═══ INTERSTELLAR SHIPS ═══
@@ -4361,7 +4424,7 @@ function anim(now){requestAnimationFrame(anim);const rDt=(now-lt)/16.67;lt=now;u
   autopilot(dt);checkEasterEggs(dt);godModePerks(dt);updateObserver(dt);updateSimAwareness(dt);updateTitleBar();
   if(fpF%120===0){checkRevelation();checkCodexDiscoveries();checkActiveChallenge();checkFinalNarration(dt);}
   if(fpF%2===0)drawPerfGraph();if(fpF%30===0)drawDNA();
-  updateWeather(dt);updatePeerStatus(dt);if(fpF%5===0)broadcastCursor();cosmicHeartbeat(dt);if(fpF%20===0){updatePad();updateProxAudio();}if(fpF%3===0)drawPianoRoll();
+  updateWeather(dt);updatePeerStatus(dt);if(fpF%5===0)broadcastCursor();cosmicHeartbeat(dt);playRadio(dt);if(fpF%20===0){updatePad();updateProxAudio();}if(fpF%3===0)drawPianoRoll();
   captureTimelapse();autoSaveTimer+=dt;if(autoSaveTimer>600){autoSaveTimer=0;autoSave();adaptQuality();}
   updA(now);updateWind();}
 
