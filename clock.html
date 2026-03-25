@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Clock</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><line x1='16' y1='16' x2='16' y2='6' stroke='%23fff' stroke-width='1' opacity='.5'/><circle cx='16' cy='16' r='2' fill='%23fff'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#050508;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:none;display:flex;justify-content:center;align-items:center;height:100vh}
+    canvas{position:fixed;top:0;left:0}
+    #time{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.1);font-size:14px;font-weight:200;letter-spacing:6px;z-index:2;font-variant-numeric:tabular-nums}
+    #date{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.06);font-size:10px;letter-spacing:4px;z-index:2}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="time"></div>
+<div id="date"></div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// Background stars
+const stars=Array.from({length:200},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random()*1.5,p:Math.random()*Math.PI*2}));
+
+function anim(){requestAnimationFrame(anim);
+  const now=new Date();
+  const h=now.getHours(),m=now.getMinutes(),s=now.getSeconds(),ms=now.getMilliseconds();
+  const sf=s+ms/1000,mf=m+sf/60,hf=h%12+mf/60;
+  const cx=W/2,cy=H/2,R=Math.min(W,H)*.35;
+
+  // Fade
+  X.fillStyle='rgba(5,5,8,.1)';X.fillRect(0,0,W,H);
+
+  // BG stars
+  for(const st of stars){st.p+=.003;X.globalAlpha=.06+Math.sin(st.p)*.04;X.fillStyle='#fff';
+    X.beginPath();X.arc(st.x%W,st.y%H,st.s,0,Math.PI*2);X.fill();}
+
+  // Hour markers — 12 constellation dots
+  for(let i=0;i<12;i++){
+    const a=i*Math.PI/6-Math.PI/2;const big=i%3===0;
+    X.globalAlpha=big?.12:.06;X.fillStyle='#fff';
+    X.beginPath();X.arc(cx+Math.cos(a)*R,cy+Math.sin(a)*R,big?3:1.5,0,Math.PI*2);X.fill();
+    // Tiny label
+    if(big){X.globalAlpha=.06;X.font='8px sans-serif';X.textAlign='center';X.textBaseline='middle';
+      X.fillText(i===0?'12':''+(i),cx+Math.cos(a)*(R+18),cy+Math.sin(a)*(R+18));}}
+
+  // Minute ring — 60 dots
+  for(let i=0;i<60;i++){
+    const a=i*Math.PI/30-Math.PI/2;const active=i<=m;
+    X.globalAlpha=active?.08:.02;X.fillStyle=active?'#6688ff':'#fff';
+    X.beginPath();X.arc(cx+Math.cos(a)*(R-15),cy+Math.sin(a)*(R-15),1,0,Math.PI*2);X.fill();}
+
+  // Second sweep — orbiting particle
+  const sa=sf*Math.PI/30-Math.PI/2;
+  // Second trail
+  for(let i=0;i<30;i++){const ta=(sf-i*.5)*Math.PI/30-Math.PI/2;const t=1-i/30;
+    X.globalAlpha=t*.08;X.fillStyle='#44ddaa';
+    X.beginPath();X.arc(cx+Math.cos(ta)*(R-15),cy+Math.sin(ta)*(R-15),1+t,0,Math.PI*2);X.fill();}
+  // Second dot
+  X.globalAlpha=.5;X.fillStyle='#44ddaa';
+  X.beginPath();X.arc(cx+Math.cos(sa)*(R-15),cy+Math.sin(sa)*(R-15),3,0,Math.PI*2);X.fill();
+  // Glow
+  X.globalAlpha=.1;X.beginPath();X.arc(cx+Math.cos(sa)*(R-15),cy+Math.sin(sa)*(R-15),10,0,Math.PI*2);X.fill();
+
+  // Hour hand — comet trail
+  const ha=hf*Math.PI/6-Math.PI/2;
+  X.globalAlpha=.15;X.strokeStyle='#ffcc44';X.lineWidth=2;
+  X.beginPath();X.moveTo(cx,cy);X.lineTo(cx+Math.cos(ha)*(R*.55),cy+Math.sin(ha)*(R*.55));X.stroke();
+  // Hour glow
+  X.globalAlpha=.06;X.fillStyle='#ffcc44';
+  X.beginPath();X.arc(cx+Math.cos(ha)*(R*.55),cy+Math.sin(ha)*(R*.55),8,0,Math.PI*2);X.fill();
+
+  // Minute hand — nebula trail
+  const ma=mf*Math.PI/30-Math.PI/2;
+  X.globalAlpha=.1;X.strokeStyle='#6688ff';X.lineWidth=1.5;
+  X.beginPath();X.moveTo(cx,cy);X.lineTo(cx+Math.cos(ma)*(R*.8),cy+Math.sin(ma)*(R*.8));X.stroke();
+  X.globalAlpha=.04;X.fillStyle='#6688ff';
+  X.beginPath();X.arc(cx+Math.cos(ma)*(R*.8),cy+Math.sin(ma)*(R*.8),6,0,Math.PI*2);X.fill();
+
+  // Center dot
+  X.globalAlpha=.3;X.fillStyle='#fff';X.beginPath();X.arc(cx,cy,3,0,Math.PI*2);X.fill();
+  X.globalAlpha=.05;X.beginPath();X.arc(cx,cy,15,0,Math.PI*2);X.fill();
+
+  // Orbit rings
+  X.globalAlpha=.02;X.strokeStyle='#fff';X.lineWidth=.5;
+  X.beginPath();X.arc(cx,cy,R,0,Math.PI*2);X.stroke();
+  X.beginPath();X.arc(cx,cy,R-15,0,Math.PI*2);X.stroke();
+
+  X.globalAlpha=1;
+
+  // Digital time
+  const pad=n=>n.toString().padStart(2,'0');
+  document.getElementById('time').textContent=pad(h)+':'+pad(m)+':'+pad(s);
+  const days=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  document.getElementById('date').textContent=days[now.getDay()]+' '+now.getFullYear()+'.'+pad(now.getMonth()+1)+'.'+pad(now.getDate());}
+anim();
+</script>
+</body>
+</html>
