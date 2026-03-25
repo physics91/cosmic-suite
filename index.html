@@ -3802,6 +3802,29 @@ function autoLoad(){
       if(k==='fLinks')fLinks=v;if(k==='fNbody')fNbody=v;if(k==='fExpo')fExpo=v;if(k==='fDm')fDm=v;if(k==='fLife')fLife=v;if(k==='fDoppler')fDoppler=v;if(k==='fBirth')fBirth=v;if(k==='fBloom')fBloom=v;if(k==='fFabric')fFabric=v;if(k==='fAuto')fAuto=v;if(k==='fTrails')fTrails=v;}
     toast('RESUMED');narrate('The cosmos remembers. Welcome back, Creator.');return true;}catch(e){return false;}}
 
+// ═══ IDLE WISDOM ═══
+let idleTimer=0,lastMouseMove=0;
+const WISDOM=[
+  'Patience is a form of creation.',
+  'The space between stars is not nothing. It is possibility.',
+  'Every observer changes what they observe.',
+  'The universe does not hurry, yet everything is accomplished.',
+  'To be still is not to be empty.',
+  'The light you see is already ancient.',
+  'Complexity arises from simplicity given time.',
+  'What you seek is also seeking you.',
+  'The cosmos wastes nothing. Every death feeds new life.',
+  'Understanding is a kind of love.',
+];
+
+C.addEventListener('mousemove',()=>lastMouseMove=performance.now());
+
+function checkIdle(){
+  const idle=(performance.now()-lastMouseMove)/1000;
+  if(idle>45&&!paused&&!zenMode){// 45 seconds idle
+    idleTimer++;if(idleTimer%600===0){// every ~10 seconds after that
+      narrate(WISDOM[(idleTimer/600|0)%WISDOM.length]);}}}
+
 // ═══ ACCESSIBILITY ═══
 const prefersReducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 if(prefersReducedMotion){// Disable screen shake and reduce particle trails
@@ -4584,7 +4607,7 @@ function anim(now){requestAnimationFrame(anim);const rDt=(now-lt)/16.67;lt=now;u
   narrativeTimer+=dt;if(narrativeTimer>800){narrativeTimer=0;autoNarrate();}
   // Stats + Sparkline + Calendar + Haiku
   statsTimer+=dt;if(statsTimer>60){statsTimer=0;updateStats();updateSparkline();updateCosmicCalendar();}
-  updateHaiku(dt);updateJournal(dt);if(tutActive)checkTutorial();else showHint(dt);updateCommentary(dt);
+  checkIdle();updateHaiku(dt);updateJournal(dt);if(tutActive)checkTutorial();else showHint(dt);updateCommentary(dt);
   autopilot(dt);checkEasterEggs(dt);godModePerks(dt);updateObserver(dt);updateSimAwareness(dt);updateTitleBar();
   if(fpF%120===0){checkRevelation();checkCodexDiscoveries();checkActiveChallenge();checkFinalNarration(dt);}
   if(fpF%2===0)drawPerfGraph();if(fpF%30===0)drawDNA();
