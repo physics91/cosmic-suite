@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gravity Canvas</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='6' fill='none' stroke='%23ff6644' stroke-width='1'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;cursor:crosshair;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block;position:absolute;top:0;left:0}
+    #art{z-index:1}
+    #ui{z-index:2;pointer-events:none}
+    #controls{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:10;pointer-events:all}
+    .btn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);padding:5px 14px;border-radius:12px;cursor:pointer;font-size:11px;transition:all .2s}
+    .btn:hover{background:rgba(255,255,255,.1);color:#fff}
+    .btn.on{background:rgba(255,100,80,.15);border-color:rgba(255,100,80,.3);color:#fff}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.25);font-size:10px;letter-spacing:2px;pointer-events:none;z-index:10}
+    #palette{position:fixed;top:16px;left:16px;display:flex;gap:4px;z-index:10}
+    .swatch{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
+    .swatch:hover,.swatch.active{border-color:#fff;transform:scale(1.2)}
+    #settings{position:fixed;top:16px;right:16px;color:rgba(255,255,255,.3);font-size:10px;z-index:10;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+    #settings label{display:flex;gap:6px;align-items:center}
+    #settings input{width:60px;accent-color:#ff6644}
+    #title{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.03);font-size:60px;font-weight:100;letter-spacing:12px;pointer-events:none;z-index:0}
+  </style>
+</head>
+<body>
+<div id="title">GRAVITY</div>
+<div id="info">CLICK TO PLACE GRAVITY WELLS · PARTICLES FLOW AROUND THEM</div>
+<canvas id="art"></canvas>
+<canvas id="ui"></canvas>
+<div id="palette"></div>
+<div id="settings">
+  <label>particles <input type="range" id="pCount" min="100" max="5000" value="1000"><span id="pVal">1000</span></label>
+  <label>gravity <input type="range" id="gStr" min="10" max="500" value="100"><span id="gVal">100</span></label>
+  <label>trail <input type="range" id="tLen" min="0" max="100" value="5"><span id="tVal2">5</span></label>
+</div>
+<div id="controls">
+  <button class="btn" onclick="clearArt()">Clear Canvas</button>
+  <button class="btn" onclick="resetParticles()">Reset Particles</button>
+  <button class="btn" onclick="clearWells()">Clear Wells</button>
+  <button class="btn" onclick="randomWells()">Random Wells</button>
+  <button class="btn" onclick="exportArt()">Export PNG</button>
+</div>
+<script>
+const artC=document.getElementById('art'),artX=artC.getContext('2d');
+const uiC=document.getElementById('ui'),uiX=uiC.getContext('2d');
+let W,H;
+function resize(){W=artC.width=uiC.width=innerWidth;H=artC.height=uiC.height=innerHeight;artX.fillStyle='#000';artX.fillRect(0,0,W,H);}
+resize();addEventListener('resize',resize);
+
+// Color palettes
+const PALETTES=[
+  {name:'Fire',colors:['#ff4422','#ff6644','#ffaa44','#ffcc66','#ffffff']},
+  {name:'Ocean',colors:['#0044aa','#0088cc','#00bbee','#44ddff','#ffffff']},
+  {name:'Aurora',colors:['#00ff88','#44ffaa','#88ffcc','#aaffee','#ffffff']},
+  {name:'Nebula',colors:['#8844ff','#aa66ff','#cc88ff','#ddaaff','#ffffff']},
+  {name:'Mono',colors:['#333333','#666666','#999999','#cccccc','#ffffff']},
+];
+let currentPalette=0,currentColor=0;
+
+// Build palette UI
+function buildPalette(){
+  const el=document.getElementById('palette');el.replaceChildren();
+  PALETTES[currentPalette].colors.forEach((c,i)=>{
+    const d=document.createElement('div');d.className='swatch'+(i===currentColor?' active':'');
+    d.style.background=c;d.onclick=()=>{currentColor=i;buildPalette();};el.appendChild(d);});
+  // Palette switcher
+  const sw=document.createElement('div');sw.className='swatch';sw.style.cssText='background:linear-gradient(135deg,#ff4422,#0088cc,#8844ff);width:20px;height:20px;margin-left:8px';
+  sw.onclick=()=>{currentPalette=(currentPalette+1)%PALETTES.length;buildPalette();};el.appendChild(sw);}
+buildPalette();
+
+// Gravity wells
+let wells=[];
+addEventListener('click',e=>{if(e.target.closest('#controls,#palette,#settings'))return;
+  wells.push({x:e.clientX,y:e.clientY,mass:+(document.getElementById('gStr').value)});});
+addEventListener('contextmenu',e=>{e.preventDefault();
+  // Remove nearest well
+  let best=-1,bd=2500;for(let i=0;i<wells.length;i++){const dx=wells[i].x-e.clientX,dy=wells[i].y-e.clientY;if(dx*dx+dy*dy<bd){bd=dx*dx+dy*dy;best=i;}}
+  if(best>=0)wells.splice(best,1);});
+
+// Particles
+let particles=[];
+function initParticles(n){
+  particles=[];for(let i=0;i<n;i++){
+    particles.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*2,vy:(Math.random()-.5)*2});}}
+initParticles(1000);
+
+// Settings
+document.getElementById('pCount').oninput=function(){document.getElementById('pVal').textContent=this.value;initParticles(+this.value);};
+document.getElementById('gStr').oninput=function(){document.getElementById('gVal').textContent=this.value;wells.forEach(w=>w.mass=+this.value);};
+document.getElementById('tLen').oninput=function(){document.getElementById('tVal2').textContent=this.value;};
+
+// Actions
+function clearArt(){artX.fillStyle='#000';artX.fillRect(0,0,W,H);}
+function resetParticles(){initParticles(+(document.getElementById('pCount').value));}
+function clearWells(){wells=[];}
+function randomWells(){clearWells();const n=3+Math.random()*5|0;
+  for(let i=0;i<n;i++)wells.push({x:Math.random()*W,y:Math.random()*H,mass:50+Math.random()*200});}
+function exportArt(){const l=document.createElement('a');l.download=`gravity_art_${Date.now()}.png`;l.href=artC.toDataURL('image/png');l.click();}
+
+// Render
+function anim(){requestAnimationFrame(anim);
+  const trail=+(document.getElementById('tLen').value);
+  const colors=PALETTES[currentPalette].colors;
+  // Fade art canvas slightly (creates trails)
+  if(trail>0){artX.fillStyle=`rgba(0,0,0,${trail/1000})`;artX.fillRect(0,0,W,H);}
+  // Update and draw particles
+  for(const p of particles){
+    // Apply gravity from wells
+    for(const w of wells){
+      const dx=w.x-p.x,dy=w.y-p.y,ds=dx*dx+dy*dy+100;
+      const d=Math.sqrt(ds);const f=w.mass/ds;
+      p.vx+=(dx/d)*f;p.vy+=(dy/d)*f;}
+    // Speed limit
+    const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
+    if(spd>8){p.vx=(p.vx/spd)*8;p.vy=(p.vy/spd)*8;}
+    p.x+=p.vx;p.y+=p.vy;
+    // Wrap
+    if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+    // Draw on art canvas — color based on speed
+    const speedNorm=Math.min(1,spd/6);
+    const colorIdx=Math.min(colors.length-1,(speedNorm*colors.length)|0);
+    artX.globalAlpha=.3+speedNorm*.5;artX.fillStyle=colors[colorIdx];
+    artX.fillRect(p.x,p.y,1,1);}
+  artX.globalAlpha=1;
+  // UI overlay — wells
+  uiX.clearRect(0,0,W,H);
+  for(const w of wells){
+    uiX.globalAlpha=.1;uiX.strokeStyle='#ff6644';uiX.lineWidth=1;
+    uiX.beginPath();uiX.arc(w.x,w.y,20,0,Math.PI*2);uiX.stroke();
+    uiX.globalAlpha=.03;
+    const g=uiX.createRadialGradient(w.x,w.y,0,w.x,w.y,w.mass);
+    g.addColorStop(0,'rgba(255,100,60,.1)');g.addColorStop(1,'rgba(0,0,0,0)');
+    uiX.fillStyle=g;uiX.beginPath();uiX.arc(w.x,w.y,w.mass,0,Math.PI*2);uiX.fill();}
+  uiX.globalAlpha=1;
+  document.getElementById('info').textContent=wells.length+' WELLS · '+particles.length+' PARTICLES · '+PALETTES[currentPalette].name.toUpperCase();}
+anim();
+</script>
+</body>
+</html>
