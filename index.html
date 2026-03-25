@@ -336,6 +336,7 @@
   <button class="b" onclick="toggleZen()">Zen<kbd>Z</kbd></button>
   <button class="b" onclick="showKbOverlay()">Keys<kbd>?</kbd></button>
   <button class="b" onclick="shareUniverse()">Share</button>
+  <button class="b" onclick="generateShareUrl()">Link</button>
   <button class="b" onclick="importUniverse()">Import</button>
   <button class="b" onclick="heatDeath()">Heat Death</button>
   <button class="b" onclick="bigCrunch()">Crunch</button>
@@ -3958,6 +3959,35 @@ function godModePerks(dt){
   // Shielded planets are ALL planets
   for(const pl of PL)shieldedPlanets.add(pl);}
 
+// ═══ URL HASH & EMBED MODE ═══
+function applyUrlParams(){
+  const params=new URLSearchParams(location.search);
+  const hash=location.hash.slice(1);
+  // Embed mode — minimal UI, auto-start
+  if(params.get('embed')==='1'){
+    document.body.classList.add('simple');
+    $('simpleToggle').style.display='none';
+    $('welcome').style.display='none';cosmosStarted=true;
+    setTimeout(()=>{bigBang();if(params.get('audio')==='1')toggleAudio();},500);}
+  // Hash params: theme, preset, zen, audio
+  if(hash){const hp=new URLSearchParams(hash);
+    const t=hp.get('theme');if(t)setTh(+t%TH.length);
+    const p=hp.get('preset');if(p&&!cosmosStarted){$('welcome').style.display='none';cosmosStarted=true;setTimeout(()=>preset(p),500);}
+    if(hp.get('zen')==='1')setTimeout(toggleZen,1000);
+    if(hp.get('audio')==='1')setTimeout(toggleAudio,800);
+    if(hp.get('screensaver')==='1'){$('welcome').style.display='none';cosmosStarted=true;setTimeout(screensaverMode,500);}}}
+
+function generateShareUrl(){
+  const base=location.origin+location.pathname;
+  const params=[];
+  params.push('theme='+cTh);
+  if(zenMode)params.push('zen=1');
+  if(aOn)params.push('audio=1');
+  const url=base+'#'+params.join('&');
+  navigator.clipboard.writeText(url).then(()=>toast('URL COPIED')).catch(()=>toast(url));
+  logEvt('share URL generated');}
+window.generateShareUrl=generateShareUrl;
+
 // ═══ SCREENSAVER MODE ═══
 function screensaverMode(){
   // Enable everything for the perfect ambient experience
@@ -4457,7 +4487,7 @@ function anim(now){requestAnimationFrame(anim);const rDt=(now-lt)/16.67;lt=now;u
   updA(now);updateWind();}
 
 function resize(){W=C.width=window.innerWidth;H=C.height=window.innerHeight;bC.width=W/2;bC.height=H/2;bC.style.width=W+'px';bC.style.height=H+'px';bC.style.display=fBloom?'block':'none';BG.length=0;for(let i=0;i<500;i++)BG.push({x:Math.random()*W*2,y:Math.random()*H*2,s:Math.random()*1.5,p:Math.random()*Math.PI*2,layer:Math.random()<.6?0:Math.random()<.7?1:2});initDust();}
-resize();initFgDust();initNebulaCanvas();window.addEventListener('resize',()=>{resize();initFgDust();initNebulaCanvas();if(fPaint)initPaintCanvas();});loadLegacy();requestAnimationFrame(anim);
+resize();initFgDust();initNebulaCanvas();applyUrlParams();window.addEventListener('resize',()=>{resize();initFgDust();initNebulaCanvas();if(fPaint)initPaintCanvas();});loadLegacy();requestAnimationFrame(anim);
 // Don't auto-bigBang — wait for welcome click
 })();
 </script>
