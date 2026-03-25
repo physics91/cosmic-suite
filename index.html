@@ -115,6 +115,10 @@
     #peerStatus{position:fixed;top:4px;left:80px;color:rgba(100,255,200,.25);font-size:7px;letter-spacing:1px;pointer-events:none;z-index:20}
     #pianoRoll{position:fixed;bottom:36px;right:12px;width:140px;height:50px;z-index:9;pointer-events:none;border:1px solid rgba(255,255,255,.04);border-radius:4px;background:rgba(0,0,0,.3)}
     #weatherIcon{position:fixed;top:50px;left:12px;color:rgba(255,255,255,.2);font-size:8px;pointer-events:none;z-index:10;letter-spacing:1px}
+    #tutorial{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);border:1px solid rgba(100,200,255,.2);border-radius:10px;padding:10px 20px;color:rgba(255,255,255,.7);font-size:11px;z-index:60;text-align:center;backdrop-filter:blur(8px);display:none;max-width:350px;letter-spacing:.5px;line-height:1.6}
+    #tutorial .tp{color:rgba(100,200,255,.5);font-size:8px;margin-top:6px;letter-spacing:1px}
+    #tutorial .tskip{color:rgba(255,255,255,.2);font-size:8px;cursor:pointer;margin-top:4px}
+    #tutorial .tskip:hover{color:rgba(255,255,255,.5)}
     #hint{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);border:1px solid rgba(100,140,255,.15);border-radius:8px;padding:6px 14px;color:rgba(255,255,255,.45);font-size:9px;z-index:55;backdrop-filter:blur(6px);pointer-events:none;opacity:0;transition:opacity 1.5s;max-width:350px;text-align:center;letter-spacing:.5px}
     #hint.show{opacity:1}
     #textInput{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#fff;font-size:14px;padding:8px 16px;width:300px;text-align:center;z-index:60;display:none;outline:none;font-weight:200;letter-spacing:2px;backdrop-filter:blur(8px)}
@@ -533,6 +537,7 @@
 <div id="peerStatus"></div>
 <canvas id="pianoRoll" width="140" height="50"></canvas>
 <div id="weatherIcon"></div>
+<div id="tutorial"><div id="tutText"></div><div class="tp" id="tutProgress"></div><div class="tskip" onclick="endTutorial()">skip tutorial</div></div>
 <div id="hint"></div>
 <input id="textInput" placeholder="type and press Enter..." maxlength="20">
 <div id="haiku"></div>
@@ -1808,6 +1813,7 @@ ACH_DEFS.push(
   {id:'palette_ach',name:'COLOR THEORIST',desc:'Extracted a color palette'},
   {id:'radio_ach',name:'RADIO ASTRONOMER',desc:'Tuned into cosmic radio'},
   {id:'screensaver',name:'AMBIENT',desc:'Activated screensaver mode'},
+  {id:'student',name:'QUICK LEARNER',desc:'Completed the tutorial'},
 );
 
 // ═══ INTERSTELLAR SHIPS ═══
@@ -2258,8 +2264,10 @@ function startCosmos(){
       // Dramatic first Big Bang
       bigBang();shake=25;
       narrate('In the beginning, there was nothing. Then, everything.');
-      // Audio prompt after 5 seconds
-      setTimeout(()=>{if(!aOn)narrate('Press A to hear the cosmos sing.');},5000);
+      // Start tutorial for new users
+      setTimeout(startTutorial,2000);
+      // Audio prompt after 5 seconds (if tutorial not active)
+      setTimeout(()=>{if(!aOn&&!tutActive)narrate('Press A to hear the cosmos sing.');},5000);
       // Help hint after 15 seconds
       setTimeout(()=>{if(usedFeatures.size<3)narrate('Right-click for creator powers. Press ? for all controls.');},15000);
       // Middle-click hint after 30 seconds
@@ -3782,6 +3790,40 @@ function autoLoad(){
       if(k==='fLinks')fLinks=v;if(k==='fNbody')fNbody=v;if(k==='fExpo')fExpo=v;if(k==='fDm')fDm=v;if(k==='fLife')fLife=v;if(k==='fDoppler')fDoppler=v;if(k==='fBirth')fBirth=v;if(k==='fBloom')fBloom=v;if(k==='fFabric')fFabric=v;if(k==='fAuto')fAuto=v;if(k==='fTrails')fTrails=v;}
     toast('RESUMED');narrate('The cosmos remembers. Welcome back, Creator.');return true;}catch(e){return false;}}
 
+// ═══ INTERACTIVE TUTORIAL ═══
+let tutStep=-1,tutActive=false;
+const TUT_STEPS=[
+  {text:'Click and drag to create stars',check:()=>P.length>20},
+  {text:'Scroll to zoom in and out',check:()=>cam.z!==1},
+  {text:'Press B for a Big Bang!',check:()=>P.length>100},
+  {text:'Right-click any star to inspect it',check:()=>inspected!==null},
+  {text:'Press A to hear the cosmos sing',check:()=>aOn},
+];
+
+function startTutorial(){
+  if(localStorage.getItem('cosmos_tut_done'))return;// only show once
+  tutActive=true;tutStep=0;showTutStep();}
+
+function showTutStep(){
+  if(tutStep>=TUT_STEPS.length){endTutorial();return;}
+  $('tutorial').style.display='block';
+  $('tutText').textContent=TUT_STEPS[tutStep].text;
+  $('tutProgress').textContent='Step '+(tutStep+1)+' of '+TUT_STEPS.length;}
+
+function checkTutorial(){
+  if(!tutActive||tutStep<0||tutStep>=TUT_STEPS.length)return;
+  if(TUT_STEPS[tutStep].check()){
+    tutStep++;
+    if(tutStep>=TUT_STEPS.length){endTutorial();}
+    else{showTutStep();cosmicBell('civ');}}}
+
+function endTutorial(){
+  tutActive=false;$('tutorial').style.display='none';
+  localStorage.setItem('cosmos_tut_done','1');
+  if(tutStep>=TUT_STEPS.length){toast('TUTORIAL COMPLETE');narrate('You know the basics. Now explore everything.');
+    unlockAch({id:'student',name:'QUICK LEARNER',desc:'Completed the tutorial'});}}
+window.endTutorial=endTutorial;
+
 // ═══ DISCOVERY HINTS ═══
 const HINTS=[
   {cond:()=>!usedFeatures.has('nbody')&&P.length>100,msg:'Try pressing G to enable N-Body gravity — watch stars attract each other'},
@@ -4478,7 +4520,7 @@ function anim(now){requestAnimationFrame(anim);const rDt=(now-lt)/16.67;lt=now;u
   narrativeTimer+=dt;if(narrativeTimer>800){narrativeTimer=0;autoNarrate();}
   // Stats + Sparkline + Calendar + Haiku
   statsTimer+=dt;if(statsTimer>60){statsTimer=0;updateStats();updateSparkline();updateCosmicCalendar();}
-  updateHaiku(dt);showHint(dt);updateCommentary(dt);
+  updateHaiku(dt);if(tutActive)checkTutorial();else showHint(dt);updateCommentary(dt);
   autopilot(dt);checkEasterEggs(dt);godModePerks(dt);updateObserver(dt);updateSimAwareness(dt);updateTitleBar();
   if(fpF%120===0){checkRevelation();checkCodexDiscoveries();checkActiveChallenge();checkFinalNarration(dt);}
   if(fpF%2===0)drawPerfGraph();if(fpF%30===0)drawDNA();
