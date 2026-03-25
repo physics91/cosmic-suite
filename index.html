@@ -335,6 +335,7 @@
   <button class="b" onclick="showCodex()">Codex<kbd>F1</kbd></button>
   <button class="b" onclick="showAchGallery()">Trophies</button>
   <button class="b" onclick="showCredits()">Credits</button>
+  <button class="b" onclick="showJournal()">Journal</button>
   <button class="b" onclick="writeStory()">Story</button>
   <button class="b" onclick="screensaverMode()">Screen Saver</button>
   <button class="b" onclick="toggleZen()">Zen<kbd>Z</kbd></button>
@@ -1814,6 +1815,7 @@ ACH_DEFS.push(
   {id:'radio_ach',name:'RADIO ASTRONOMER',desc:'Tuned into cosmic radio'},
   {id:'screensaver',name:'AMBIENT',desc:'Activated screensaver mode'},
   {id:'student',name:'QUICK LEARNER',desc:'Completed the tutorial'},
+  {id:'diarist',name:'DIARIST',desc:'Read the universe\'s journal'},
 );
 
 // ═══ INTERSTELLAR SHIPS ═══
@@ -3790,6 +3792,49 @@ function autoLoad(){
       if(k==='fLinks')fLinks=v;if(k==='fNbody')fNbody=v;if(k==='fExpo')fExpo=v;if(k==='fDm')fDm=v;if(k==='fLife')fLife=v;if(k==='fDoppler')fDoppler=v;if(k==='fBirth')fBirth=v;if(k==='fBloom')fBloom=v;if(k==='fFabric')fFabric=v;if(k==='fAuto')fAuto=v;if(k==='fTrails')fTrails=v;}
     toast('RESUMED');narrate('The cosmos remembers. Welcome back, Creator.');return true;}catch(e){return false;}}
 
+// ═══ COSMIC JOURNAL ═══
+let journal=[],journalTimer2=0;
+const JOURNAL_TEMPLATES={
+  star_many:(n)=>'I feel full today. '+n+' stars burn within me, each one a small defiance against the dark.',
+  star_few:(n)=>'Only '+n+' stars remain. The spaces between them grow wider. I try not to think about it.',
+  bh_new:()=>'A new void opened inside me. I cannot see what falls in, but I feel its weight.',
+  civ_born:(name)=>'Something stirred on a small world. '+name+' — they call themselves. They do not yet know how brief they are.',
+  civ_died:(name)=>''+name+' is gone. Their cities are dark. I will carry their memory in my dust.',
+  fusion:()=>'Two of my stars collided today. The light was beautiful. From their union, something larger was born.',
+  contact:(a,b)=>''+a+' and '+b+' found each other across the void. The message was simple: "We are here."',
+  peace:()=>'Nothing remarkable happened today. Perhaps that is remarkable in itself.',
+  old:()=>'I am old now. My stars burn lower. But the patterns they make — I think they are more beautiful than ever.',
+};
+
+function updateJournal(dt){
+  journalTimer2+=dt;if(journalTimer2<800)return;journalTimer2=0;
+  let entry=null;const age=simTime/60|0;
+  if(P.length>500&&Math.random()<.3)entry=JOURNAL_TEMPLATES.star_many(P.length);
+  else if(P.length<10&&P.length>0&&Math.random()<.3)entry=JOURNAL_TEMPLATES.star_few(P.length);
+  else if(BH.length>0&&Math.random()<.1)entry=JOURNAL_TEMPLATES.bh_new();
+  else if(fusN>0&&Math.random()<.08)entry=JOURNAL_TEMPLATES.fusion();
+  else if(age>300&&Math.random()<.1)entry=JOURNAL_TEMPLATES.old();
+  else if(Math.random()<.15)entry=JOURNAL_TEMPLATES.peace();
+  if(!entry)return;
+  const stamp=(age>60?(age/60|0)+'m '+(age%60)+'s':age+'s');
+  journal.push({t:stamp,text:entry});if(journal.length>30)journal.shift();}
+
+function showJournal(){
+  const el=$('chronicle');el.style.display='block';el.replaceChildren();
+  const cls=document.createElement('div');cls.className='close';cls.textContent='x';cls.onclick=()=>el.style.display='none';el.appendChild(cls);
+  const div=document.createElement('div');div.className='cc';
+  const h=document.createElement('h1');h.textContent='JOURNAL';h.style.fontSize='22px';div.appendChild(h);
+  const sub=document.createElement('div');sub.style.cssText='text-align:center;color:rgba(255,255,255,.2);font-size:10px;font-style:italic;margin-bottom:20px';
+  sub.textContent='The private thoughts of a universe';div.appendChild(sub);
+  if(!journal.length){const empty=document.createElement('div');empty.style.cssText='color:rgba(255,255,255,.2);text-align:center;margin:40px';empty.textContent='The journal is empty. Give the universe time to reflect.';div.appendChild(empty);}
+  for(let i=journal.length-1;i>=0;i--){const e=journal[i];
+    const entry=document.createElement('div');entry.className='ce';
+    const ts=document.createElement('span');ts.className='ct';ts.textContent=e.t;
+    entry.appendChild(ts);entry.appendChild(document.createTextNode(e.text));div.appendChild(entry);}
+  el.appendChild(div);
+  unlockAch({id:'diarist',name:'DIARIST',desc:'Read the universe\'s journal'});}
+window.showJournal=showJournal;
+
 // ═══ INTERACTIVE TUTORIAL ═══
 let tutStep=-1,tutActive=false;
 const TUT_STEPS=[
@@ -4520,7 +4565,7 @@ function anim(now){requestAnimationFrame(anim);const rDt=(now-lt)/16.67;lt=now;u
   narrativeTimer+=dt;if(narrativeTimer>800){narrativeTimer=0;autoNarrate();}
   // Stats + Sparkline + Calendar + Haiku
   statsTimer+=dt;if(statsTimer>60){statsTimer=0;updateStats();updateSparkline();updateCosmicCalendar();}
-  updateHaiku(dt);if(tutActive)checkTutorial();else showHint(dt);updateCommentary(dt);
+  updateHaiku(dt);updateJournal(dt);if(tutActive)checkTutorial();else showHint(dt);updateCommentary(dt);
   autopilot(dt);checkEasterEggs(dt);godModePerks(dt);updateObserver(dt);updateSimAwareness(dt);updateTitleBar();
   if(fpF%120===0){checkRevelation();checkCodexDiscoveries();checkActiveChallenge();checkFinalNarration(dt);}
   if(fpF%2===0)drawPerfGraph();if(fpF%30===0)drawDNA();
