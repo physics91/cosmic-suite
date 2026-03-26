@@ -6,16 +6,116 @@
   <title>Lost in Space</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#050508;color:#fff;font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-    h1{font-weight:100;font-size:60px;letter-spacing:10px;opacity:.3;margin-bottom:10px}
-    p{color:rgba(255,255,255,.3);font-size:13px;letter-spacing:2px;margin-bottom:30px}
-    a{color:rgba(100,140,255,.6);text-decoration:none;font-size:12px;letter-spacing:2px;border:1px solid rgba(100,140,255,.2);padding:8px 20px;border-radius:12px;transition:all .2s}
-    a:hover{background:rgba(100,140,255,.1);color:#fff}
+    body{background:#020208;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #msg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:2;pointer-events:none}
+    #msg h1{font-weight:100;font-size:80px;letter-spacing:10px;color:rgba(255,255,255,.15)}
+    #msg p{color:rgba(255,255,255,.1);font-size:11px;letter-spacing:2px;margin-top:10px}
+    #hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.08);font-size:9px;z-index:2;pointer-events:none;letter-spacing:2px}
   </style>
 </head>
 <body>
-  <h1>404</h1>
-  <p>You've drifted into the void.</p>
-  <a href="portal.html">Return to the Cosmic Suite</a>
+<canvas id="c"></canvas>
+<div id="msg"><h1>404</h1><p>lost in space &middot; find the portal home</p></div>
+<div id="hint">ARROW KEYS OR MOUSE TO FLY</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// Ship
+let sx=0,sy=0,svx=0,svy=0;
+// Portal — appears randomly
+let px=(Math.random()-.5)*2000,py=(Math.random()-.5)*2000;
+let found=false,foundTimer=0;
+
+// Stars in world space
+const stars=Array.from({length:300},()=>({
+  x:(Math.random()-.5)*4000,y:(Math.random()-.5)*4000,
+  s:.5+Math.random()*1.5,p:Math.random()*Math.PI*2
+}));
+
+// Input
+let keys={};
+addEventListener('keydown',e=>{keys[e.key]=true;});
+addEventListener('keyup',e=>{keys[e.key]=false;});
+let mx=W/2,my=H/2;
+addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+
+function anim(){requestAnimationFrame(anim);
+  // Thrust toward mouse or keys
+  const thrust=.05;
+  if(keys.ArrowUp||keys.w)svy-=thrust;
+  if(keys.ArrowDown||keys.s)svy+=thrust;
+  if(keys.ArrowLeft||keys.a)svx-=thrust;
+  if(keys.ArrowRight||keys.d)svx+=thrust;
+  // Mouse attraction
+  const mdx=mx-W/2,mdy=my-H/2;
+  const md=Math.sqrt(mdx*mdx+mdy*mdy);
+  if(md>30){svx+=mdx/md*.01;svy+=mdy/md*.01;}
+  svx*=.99;svy*=.99;sx+=svx;sy+=svy;
+
+  // Check portal
+  const pdx=px-sx,pdy=py-sy;
+  const pd=Math.sqrt(pdx*pdx+pdy*pdy);
+  if(pd<30&&!found){
+    found=true;foundTimer=120;
+    document.getElementById('msg').querySelector('h1').textContent='\u2605';
+    document.getElementById('msg').querySelector('p').textContent='portal found! returning home...';
+  }
+  if(found){foundTimer--;if(foundTimer<=0)location.href='portal.html';}
+
+  // Render
+  X.fillStyle='rgba(2,2,8,.15)';X.fillRect(0,0,W,H);
+
+  // Stars (parallax)
+  for(const s of stars){
+    s.p+=.002;
+    const screenX=W/2+(s.x-sx)*.5;const screenY=H/2+(s.y-sy)*.5;
+    if(screenX<-10||screenX>W+10||screenY<-10||screenY>H+10)continue;
+    X.globalAlpha=.06+Math.sin(s.p)*.03;X.fillStyle='#fff';
+    X.beginPath();X.arc(screenX,screenY,s.s,0,Math.PI*2);X.fill();
+  }
+
+  // Portal beacon
+  if(!found){
+    const portalScreenX=W/2+(px-sx);const portalScreenY=H/2+(py-sy);
+    // Glow
+    X.globalAlpha=.05+Math.sin(Date.now()*.003)*.03;
+    const pg=X.createRadialGradient(portalScreenX,portalScreenY,0,portalScreenX,portalScreenY,40);
+    pg.addColorStop(0,'rgba(100,140,255,.3)');pg.addColorStop(1,'rgba(0,0,0,0)');
+    X.fillStyle=pg;X.beginPath();X.arc(portalScreenX,portalScreenY,40,0,Math.PI*2);X.fill();
+    // Core
+    X.globalAlpha=.4+Math.sin(Date.now()*.005)*.2;X.fillStyle='#6688ff';
+    X.beginPath();X.arc(portalScreenX,portalScreenY,5,0,Math.PI*2);X.fill();
+    // Direction arrow if off-screen
+    if(portalScreenX<0||portalScreenX>W||portalScreenY<0||portalScreenY>H){
+      const angle=Math.atan2(py-sy,px-sx);
+      const arrowX=W/2+Math.cos(angle)*100;const arrowY=H/2+Math.sin(angle)*100;
+      X.globalAlpha=.1;X.fillStyle='#6688ff';
+      X.beginPath();X.arc(arrowX,arrowY,3,0,Math.PI*2);X.fill();
+      X.globalAlpha=.05;X.strokeStyle='#6688ff';X.lineWidth=.5;
+      X.beginPath();X.moveTo(W/2,H/2);X.lineTo(arrowX,arrowY);X.stroke();
+    }
+    // Distance
+    X.globalAlpha=.06;X.fillStyle='#fff';X.font='8px monospace';X.textAlign='center';
+    X.fillText(Math.round(pd)+'px',W/2,H-40);
+  }
+
+  // Ship
+  const shipAngle=Math.atan2(svy,svx);
+  const spd=Math.sqrt(svx*svx+svy*svy);
+  X.globalAlpha=.6;X.fillStyle='#fff';
+  X.save();X.translate(W/2,H/2);X.rotate(shipAngle);
+  X.beginPath();X.moveTo(8,0);X.lineTo(-4,-4);X.lineTo(-2,0);X.lineTo(-4,4);X.closePath();X.fill();
+  // Engine
+  if(spd>.1){X.globalAlpha=.3;X.fillStyle='#ffaa44';
+    X.beginPath();X.arc(-5,0,2+Math.random(),0,Math.PI*2);X.fill();}
+  X.restore();
+
+  X.globalAlpha=1;
+}
+anim();
+</script>
 </body>
 </html>
