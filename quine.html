@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quine</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><text x='16' y='20' text-anchor='middle' fill='%23fff' font-size='10' opacity='.4'>&lt;/&gt;</text></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#020208;overflow:hidden;font-family:'Courier New',monospace}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;font-family:'Segoe UI',sans-serif}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px;font-family:'Segoe UI',sans-serif}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">QUINE &middot; A PROGRAM THAT DISPLAYS ITSELF</div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="cycleMode()">Mode: <span id="modeV">Galaxy</span></button>
+<button class="btn" style="bottom:16px;right:120px" onclick="cycleColor()">Color: <span id="colV">Syntax</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px;font-family:'Segoe UI',sans-serif">&larr; suite</a><a id="random-jump" href="portal.html" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px;font-family:'Segoe UI',sans-serif">random &rarr;</a>
+<script>document.getElementById('random-jump').onclick=function(){const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chaos-map.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-life.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','orbits.html','order.html','pendulum.html','pi.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','spirograph.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false;};</script>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// Get own source code
+const src=document.documentElement.outerHTML;
+const chars=[];
+for(let i=0;i<src.length;i++){
+  chars.push({ch:src[i],code:src.charCodeAt(i)});
+}
+
+let mode=0,colorMode=0,time=0,scrollY=0;
+const MODES=['Galaxy','Text','Rain','Spiral'];
+const COLORS=['Syntax','Rainbow','Mono','Heat'];
+
+function cycleMode(){mode=(mode+1)%MODES.length;document.getElementById('modeV').textContent=MODES[mode];}
+function cycleColor(){colorMode=(colorMode+1)%COLORS.length;document.getElementById('colV').textContent=COLORS[colorMode];}
+
+// Syntax coloring
+function charColor(ch,idx){
+  if(colorMode===1)return'hsl('+(idx*.2%360)+',60%,55%)';
+  if(colorMode===2)return'rgba(200,200,220,.5)';
+  if(colorMode===3){const v=ch.charCodeAt(0)/127;return'hsl('+(v*60)+','+(40+v*40)+'%,50%)';}
+  // Syntax mode
+  if('<>/'.includes(ch))return'rgba(255,100,80,.6)';
+  if('(){}[]'.includes(ch))return'rgba(255,200,100,.6)';
+  if('=:;,'.includes(ch))return'rgba(150,150,200,.4)';
+  if(ch>='0'&&ch<='9')return'rgba(100,200,255,.6)';
+  if(ch>='A'&&ch<='Z')return'rgba(100,255,150,.5)';
+  if("'\"".includes(ch))return'rgba(255,180,100,.5)';
+  return'rgba(180,180,200,.3)';
+}
+
+addEventListener('wheel',e=>{e.preventDefault();scrollY+=e.deltaY*.5;},{passive:false});
+addEventListener('keydown',e=>{
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key===' '){e.preventDefault();cycleMode();}
+});
+
+function anim(){requestAnimationFrame(anim);time+=.016;
+  X.fillStyle='rgba(2,2,8,.08)';X.fillRect(0,0,W,H);
+
+  if(mode===0){
+    // GALAXY MODE — each char is a star positioned in spiral
+    for(let i=0;i<Math.min(chars.length,5000);i++){
+      const a=i*.05+time*.1;const r=50+Math.sqrt(i)*3;
+      const px=W/2+Math.cos(a)*r;const py=H/2+Math.sin(a)*r*.6; // flatten
+      if(px<-10||px>W+10||py<-10||py>H+10)continue;
+      const ch=chars[i].ch;
+      X.globalAlpha=.3;X.fillStyle=charColor(ch,i);X.font='6px monospace';X.textAlign='center';
+      X.fillText(ch,px,py);
+    }
+  }
+  else if(mode===1){
+    // TEXT MODE — readable source with scroll
+    const lineH=10;const colW=5.5;const cols=Math.floor(W/colW)-4;
+    const startChar=Math.max(0,Math.floor(scrollY/lineH)*cols);
+    const visibleLines=Math.ceil(H/lineH)+2;
+
+    for(let line=0;line<visibleLines;line++){
+      const charStart=startChar+line*cols;
+      if(charStart>=chars.length)break;
+      const y=line*lineH-(scrollY%lineH)+lineH;
+      // Line number
+      X.globalAlpha=.06;X.fillStyle='#fff';X.font='7px monospace';X.textAlign='right';
+      X.fillText(Math.floor(charStart/cols)+'',18,y);
+      // Characters
+      for(let c=0;c<cols&&charStart+c<chars.length;c++){
+        const ch=chars[charStart+c].ch;
+        if(ch==='\n')continue;
+        X.globalAlpha=.4;X.fillStyle=charColor(ch,charStart+c);X.font='8px monospace';X.textAlign='left';
+        X.fillText(ch,24+c*colW,y);
+      }
+    }
+  }
+  else if(mode===2){
+    // RAIN MODE — characters fall like Matrix
+    for(let col=0;col<Math.min(W/8,200);col++){
+      const speed=2+chars[col*7%chars.length].code*.02;
+      const idx=Math.floor(time*speed*10+col*137)%chars.length;
+      const ch=chars[idx].ch;
+      const x=col*8;const y=(time*speed*30+col*97)%H;
+      X.globalAlpha=.3;X.fillStyle=charColor(ch,idx);X.font='9px monospace';X.textAlign='left';
+      X.fillText(ch,x,y);
+      // Trail
+      for(let t=1;t<8;t++){
+        const ti=(idx-t+chars.length)%chars.length;
+        X.globalAlpha=.1*(1-t/8);
+        X.fillText(chars[ti].ch,x,y-t*10);
+      }
+    }
+  }
+  else if(mode===3){
+    // SPIRAL MODE — source code in expanding spiral
+    const cx=W/2,cy=H/2;
+    const offset=Math.floor(scrollY*.5);
+    for(let i=0;i<Math.min(2000,chars.length);i++){
+      const ci=(i+offset+chars.length)%chars.length;
+      const a=i*.03;const r=20+i*.15;
+      const px=cx+Math.cos(a)*r;const py=cy+Math.sin(a)*r;
+      if(px<-10||px>W+10||py<-10||py>H+10)continue;
+      const ch=chars[ci].ch;
+      X.globalAlpha=.3*(1-i/2000);X.fillStyle=charColor(ch,ci);X.font='7px monospace';X.textAlign='center';
+      X.fillText(ch,px,py);
+    }
+  }
+
+  X.globalAlpha=1;
+  document.getElementById('stats').textContent=
+    'source: '+src.length+' chars\nmode: '+MODES[mode]+'\ncolor: '+COLORS[colorMode];
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="quine.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
