@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conway</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='13' y='13' width='3' height='3' fill='%2344ff88' opacity='.5'/><rect x='16' y='13' width='3' height='3' fill='%2344ff88' opacity='.5'/><rect x='16' y='16' width='3' height='3' fill='%2344ff88' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#030308;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #hud{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.1);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+    .btn.active{background:rgba(68,255,136,.1);border-color:rgba(68,255,136,.3)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">DRAW LIFE &middot; SPACE = PAUSE &middot; CLICK TO PLACE</div>
+<div id="stats"></div>
+<button class="btn active" style="bottom:16px;right:16px" id="btnRun" onclick="running=!running;this.classList.toggle('active')">Running</button>
+<button class="btn" style="bottom:16px;right:95px" onclick="clear_()">Clear</button>
+<button class="btn" style="bottom:16px;right:145px" onclick="randomize()">Random</button>
+<button class="btn" style="bottom:16px;right:215px" onclick="placePattern('glider')">Glider</button>
+<button class="btn" style="bottom:16px;right:275px" onclick="placePattern('pulsar')">Pulsar</button>
+<button class="btn" style="bottom:16px;right:340px" onclick="placePattern('gun')">Gun</button>
+<button class="btn" style="bottom:40px;right:16px" onclick="speed=speed>=8?1:speed*2;this.textContent='Speed '+speed+'x'">Speed 1x</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+const CELL=4;
+let cols,rows,grid,glow;
+let running=true,gen=0,speed=1,population=0;
+
+function resize(){
+  W=C.width=innerWidth;H=C.height=innerHeight;
+  cols=Math.ceil(W/CELL);rows=Math.ceil(H/CELL);
+  const newGrid=new Uint8Array(cols*rows);
+  const newGlow=new Float32Array(cols*rows);
+  if(grid){for(let y=0;y<Math.min(rows,(grid.length/cols)|0);y++)for(let x=0;x<Math.min(cols,grid.length);x++){const i=y*cols+x;if(i<newGrid.length&&y*cols+x<grid.length){newGrid[i]=grid[y*cols+x]||0;}}}
+  grid=newGrid;glow=newGlow;
+}
+resize();addEventListener('resize',resize);
+
+function idx(x,y){return((y%rows)+rows)%rows*cols+((x%cols)+cols)%cols;}
+
+function step(){
+  const next=new Uint8Array(cols*rows);
+  population=0;
+  for(let y=0;y<rows;y++){
+    for(let x=0;x<cols;x++){
+      let neighbors=0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(dx===0&&dy===0)continue;
+        neighbors+=grid[idx(x+dx,y+dy)];
+      }
+      const i=y*cols+x;
+      const alive=grid[i];
+      if(alive){
+        next[i]=(neighbors===2||neighbors===3)?1:0;
+        if(!next[i])glow[i]=1; // death glow
+      }else{
+        next[i]=neighbors===3?1:0;
+        if(next[i])glow[i]=1; // birth glow
+      }
+      if(next[i])population++;
+    }
+  }
+  grid=next;gen++;
+}
+
+function randomize(){
+  for(let i=0;i<grid.length;i++)grid[i]=Math.random()<.15?1:0;
+  glow.fill(0);gen=0;
+}
+
+function clear_(){grid.fill(0);glow.fill(0);gen=0;}
+
+// === PATTERNS ===
+const PATTERNS={
+  glider:[[0,1,0],[0,0,1],[1,1,1]],
+  pulsar:[
+    [0,0,1,1,1,0,0,0,1,1,1,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [1,0,0,0,0,1,0,1,0,0,0,0,1],
+    [1,0,0,0,0,1,0,1,0,0,0,0,1],
+    [1,0,0,0,0,1,0,1,0,0,0,0,1],
+    [0,0,1,1,1,0,0,0,1,1,1,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,1,1,1,0,0,0,1,1,1,0,0],
+    [1,0,0,0,0,1,0,1,0,0,0,0,1],
+    [1,0,0,0,0,1,0,1,0,0,0,0,1],
+    [1,0,0,0,0,1,0,1,0,0,0,0,1],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,1,1,1,0,0,0,1,1,1,0,0],
+  ],
+  gun:[
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+    [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+    [1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [1,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  ],
+};
+
+let placeMX=0,placeMY=0;
+addEventListener('mousemove',e=>{placeMX=e.clientX;placeMY=e.clientY;});
+
+function placePattern(name){
+  const p=PATTERNS[name];if(!p)return;
+  const cx=Math.floor(placeMX/CELL)-Math.floor(p[0].length/2);
+  const cy=Math.floor(placeMY/CELL)-Math.floor(p.length/2);
+  for(let y=0;y<p.length;y++)for(let x=0;x<p[y].length;x++){
+    const gi=idx(cx+x,cy+y);
+    grid[gi]=p[y][x];if(p[y][x])glow[gi]=1;
+  }
+}
+
+// === INPUT ===
+let drawing=false;
+C.addEventListener('mousedown',e=>{drawing=true;paint(e.clientX,e.clientY);});
+C.addEventListener('mousemove',e=>{if(drawing)paint(e.clientX,e.clientY);});
+addEventListener('mouseup',()=>{drawing=false;});
+C.addEventListener('touchstart',e=>{e.preventDefault();drawing=true;paint(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+C.addEventListener('touchmove',e=>{e.preventDefault();if(drawing)paint(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+C.addEventListener('touchend',()=>{drawing=false;});
+
+function paint(mx,my){
+  const cx=Math.floor(mx/CELL),cy=Math.floor(my/CELL);
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    if(Math.random()<.6){
+      const gi=idx(cx+dx,cy+dy);grid[gi]=1;glow[gi]=1;
+    }
+  }
+}
+
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();running=!running;document.getElementById('btnRun').classList.toggle('active');document.getElementById('btnRun').textContent=running?'Running':'Paused';}
+  if(e.key==='c')clear_();
+  if(e.key==='r')randomize();
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='n'&&!running)step(); // single step
+});
+
+// Initial random sparse
+randomize();
+
+// === RENDER ===
+let imgData=null;
+const offC=document.createElement('canvas');
+const offX=offC.getContext('2d');
+
+function render(){
+  // Decay glow
+  for(let i=0;i<glow.length;i++)if(glow[i]>0)glow[i]*=.92;
+
+  offC.width=cols;offC.height=rows;
+  if(!imgData||imgData.width!==cols)imgData=new ImageData(cols,rows);
+  const d=imgData.data;
+
+  for(let i=0;i<cols*rows;i++){
+    const pi=i*4;
+    const alive=grid[i];
+    const g=glow[i];
+    if(alive){
+      // Living cell — green-white based on glow
+      const bright=g>.5;
+      d[pi]=bright?180:40;
+      d[pi+1]=bright?255:200;
+      d[pi+2]=bright?180:100;
+      d[pi+3]=255;
+    }else if(g>.01){
+      // Death afterglow — fading amber
+      const intensity=g;
+      d[pi]=Math.floor(80*intensity);
+      d[pi+1]=Math.floor(40*intensity);
+      d[pi+2]=Math.floor(15*intensity);
+      d[pi+3]=255;
+    }else{
+      d[pi]=3;d[pi+1]=3;d[pi+2]=8;d[pi+3]=255;
+    }
+  }
+
+  offX.putImageData(imgData,0,0);
+  X.imageSmoothingEnabled=false;
+  X.drawImage(offC,0,0,cols,rows,0,0,W,H);
+
+  document.getElementById('stats').textContent=
+    'gen: '+gen+'\npop: '+population+'\ncells: '+cols+'x'+rows+'\nspeed: '+speed+'x';
+}
+
+function anim(){
+  requestAnimationFrame(anim);
+  if(running)for(let i=0;i<speed;i++)step();
+  render();
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="conway.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
