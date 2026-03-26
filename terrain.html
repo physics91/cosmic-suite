@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Terrain</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><path d='M6 22 L16 8 L26 22' fill='none' stroke='%2388aaff' stroke-width='1.5' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.2);font-size:10px;letter-spacing:2px;z-index:2;pointer-events:none}
+    #coords{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.15);font-size:9px;z-index:2;pointer-events:none;font-family:monospace}
+    #biome{position:fixed;bottom:16px;right:16px;color:rgba(255,255,255,.2);font-size:10px;z-index:2;pointer-events:none;letter-spacing:1px}
+    #title{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.02);font-size:50px;font-weight:100;letter-spacing:10px;pointer-events:none}
+  </style>
+</head>
+<body>
+<div id="title">TERRAIN</div>
+<div id="info">SCROLL TO FLY · MOUSE TO LOOK · CLICK TO CHANGE PLANET</div>
+<div id="coords"></div>
+<div id="biome"></div>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<canvas id="c"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// Noise
+function hash(x,y){const n=Math.sin(x*127.1+y*311.7)*43758.5453;return n-Math.floor(n);}
+function smooth(x,y){const ix=Math.floor(x),iy=Math.floor(y),fx=x-ix,fy=y-iy;
+  const sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
+  return hash(ix,iy)*(1-sx)*(1-sy)+hash(ix+1,iy)*sx*(1-sy)+hash(ix,iy+1)*(1-sx)*sy+hash(ix+1,iy+1)*sx*sy;}
+function fbm(x,y,oct){let v=0,a=.5,f=1;for(let i=0;i<oct;i++){v+=smooth(x*f,y*f)*a;a*=.5;f*=2;}return v;}
+
+// Camera
+let camX=0,camZ=0,camY=80,pitch=.4,yaw=0,speed=0;
+let mx=W/2,my=H/2;
+let seed=Math.random()*1000|0;
+
+// Planet types
+const PLANETS=[
+  {name:'TERRA',water:.35,snow:.75,colors:['#1a3a5c','#2a6a3a','#4a8a3a','#8a7a5a','#aaa','#fff'],sky:[10,15,40]},
+  {name:'MARS',water:.1,snow:.9,colors:['#4a2020','#6a3020','#8a4a30','#aa6a40','#cc9a70','#ddbbaa'],sky:[20,8,5]},
+  {name:'ICE WORLD',water:.2,snow:.4,colors:['#1a2a4a','#3a5a7a','#8aaacc','#aaccee','#ddeeff','#fff'],sky:[5,8,20]},
+  {name:'VOLCANIC',water:.05,snow:.95,colors:['#1a0a0a','#3a1a0a','#6a2a0a','#aa4a0a','#ff6a20','#ffaa40'],sky:[15,5,2]},
+  {name:'ALIEN',water:.3,snow:.8,colors:['#1a1a3a','#2a4a3a','#3a8a6a','#6aaa4a','#aacc6a','#eeffcc'],sky:[8,12,25]},
+];
+let planet=PLANETS[seed%PLANETS.length];
+
+function getHeight(wx,wz){return fbm(wx*.008+seed,wz*.008+seed*2,6);}
+
+function getColor(h){
+  const cols=planet.colors;
+  if(h<planet.water)return cols[0];// water
+  const land=(h-planet.water)/(1-planet.water);
+  if(land<.2)return cols[1];
+  if(land<.4)return cols[2];
+  if(land<.6)return cols[3];
+  if(h>planet.snow)return cols[5];// snow
+  return cols[4];}
+
+function getBiome(h){
+  if(h<planet.water)return 'ocean';
+  const land=(h-planet.water)/(1-planet.water);
+  if(land<.15)return 'beach';if(land<.35)return 'plains';
+  if(land<.55)return 'hills';if(h>planet.snow)return 'peaks';return 'mountains';}
+
+// Input
+addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+addEventListener('wheel',e=>{e.preventDefault();speed+=e.deltaY>0?.5:-.5;},{passive:false});
+addEventListener('click',()=>{seed=Math.random()*1000|0;planet=PLANETS[seed%PLANETS.length];});
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
+
+// Render — raycasting style terrain
+function anim(){requestAnimationFrame(anim);
+  // Camera controls
+  yaw+=(mx/W-.5)*.03;pitch=.1+(my/H)*.8;
+  speed*=.95;
+  camX+=Math.sin(yaw)*speed;camZ+=Math.cos(yaw)*speed;
+  camY=60+getHeight(camX*.1,camZ*.1)*120;
+
+  // Sky gradient
+  const[sr,sg,sb]=planet.sky;
+  const skyG=X.createLinearGradient(0,0,0,H*.6);
+  skyG.addColorStop(0,`rgb(${sr},${sg},${sb})`);
+  skyG.addColorStop(1,`rgb(${sr*3},${sg*3},${sb*2})`);
+  X.fillStyle=skyG;X.fillRect(0,0,W,H*.6);
+  X.fillStyle=`rgb(${sr},${sg},${sb})`;X.fillRect(0,H*.6,W,H*.4);
+
+  // Stars in sky
+  X.fillStyle='#fff';
+  for(let i=0;i<40;i++){X.globalAlpha=.1+hash(i,seed)*.15;
+    X.beginPath();X.arc((hash(i,1)*W+camX*(.1+i*.01))%W,hash(i,2)*H*.4,hash(i,3)*.8+.3,0,Math.PI*2);X.fill();}
+
+  // Terrain rendering — vertical scanlines
+  const COLS=Math.min(W,200);const DETAIL=120;
+  for(let col=0;col<COLS;col++){
+    const screenX=col/COLS;const angle=yaw+(screenX-.5)*.8;
+    let maxY=H;
+    for(let d=1;d<DETAIL;d++){
+      const dist=d*3;
+      const wx=camX+Math.sin(angle)*dist;const wz=camZ+Math.cos(angle)*dist;
+      const h=getHeight(wx*.1,wz*.1);
+      const terrainY=h*120;
+      const screenY=H*.5+(camY-terrainY)/(dist*.04)*pitch;
+      if(screenY<maxY&&screenY>0){
+        // Fog based on distance
+        const fog=Math.min(1,dist/300);
+        const baseCol=getColor(h);
+        X.globalAlpha=1-fog*.7;X.fillStyle=baseCol;
+        const colW=Math.ceil(W/COLS)+1;
+        X.fillRect(col*W/COLS,screenY,colW,maxY-screenY);
+        maxY=screenY;}}}
+
+  // Sun/moon
+  X.globalAlpha=.15;X.fillStyle='#ffeecc';
+  const sunX=W*.8+Math.sin(Date.now()*.0001)*100;
+  X.beginPath();X.arc(sunX,H*.15,20,0,Math.PI*2);X.fill();
+  X.globalAlpha=.03;X.beginPath();X.arc(sunX,H*.15,60,0,Math.PI*2);X.fill();
+
+  X.globalAlpha=1;
+  // HUD
+  const ch=getHeight(camX*.1,camZ*.1);
+  document.getElementById('coords').textContent=
+    'x:'+Math.round(camX)+' z:'+Math.round(camZ)+' alt:'+Math.round(camY)+' spd:'+Math.abs(speed).toFixed(1);
+  document.getElementById('biome').textContent=planet.name+' · '+getBiome(ch);}
+anim();
+</script>
+</body>
+</html>
