@@ -147,8 +147,10 @@ function render(){requestAnimationFrame(render);
     X.globalAlpha=.15;X.fillStyle='#ffcc44';X.beginPath();X.arc(c.x,c.y,c.sz*3,0,Math.PI*2);X.fill();
     X.globalAlpha=.7;X.beginPath();X.arc(c.x,c.y,c.sz,0,Math.PI*2);X.fill();}
   // Ship trail
+  const spd2=Math.sqrt(ship.vx*ship.vx+ship.vy*ship.vy);
+  const trailHue=spd2>4?0:spd2>2?40:200;// fast=red, mid=orange, slow=blue
   for(let i=1;i<ship.trail.length;i++){const t=i/ship.trail.length;
-    X.globalAlpha=t*.15;X.strokeStyle='#44aaff';X.lineWidth=t*2;
+    X.globalAlpha=t*.15;X.strokeStyle=`hsl(${trailHue},70%,60%)`;X.lineWidth=t*2;
     X.beginPath();X.moveTo(ship.trail[i-1].x,ship.trail[i-1].y);X.lineTo(ship.trail[i].x,ship.trail[i].y);X.stroke();}
   // Ship
   if(ship.alive){X.globalAlpha=.2;X.fillStyle='#44aaff';X.beginPath();X.arc(ship.x,ship.y,8,0,Math.PI*2);X.fill();
