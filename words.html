@@ -27,7 +27,7 @@ let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
 // Each word becomes a living entity with personality derived from its letters
-let entities=[];
+let entities=[],wordBirths=[],totalBirths=0,totalDeaths=0;
 
 class WordEntity{
   constructor(word,x,y){
@@ -49,11 +49,27 @@ class WordEntity{
     const force=(affinity*this.social*.5+this.social*.1)*(1-d/300)/d;
     this.vx+=dx/d*force;this.vy+=dy/d*force;
     // Repel when too close
-    if(d<this.size+other.size){this.vx-=dx/d*.3;this.vy-=dy/d*.3;}}
+    if(d<this.size+other.size){this.vx-=dx/d*.3;this.vy-=dy/d*.3;}
+    // COLLISION — exchange letters and spawn new word
+    if(d<this.size&&this.age>60&&other.age>60&&!this._justBred&&!other._justBred&&entities.length<50){
+      if(Math.random()<.02&&this.word.length>1&&other.word.length>1){
+        // Take random letter from each, form child
+        const l1=this.word[Math.random()*this.word.length|0];
+        const l2=other.word[Math.random()*other.word.length|0];
+        const childLetters=[l1,l2];
+        // Add random vowel/consonant for viability
+        if(Math.random()<.5)childLetters.push('aeiou'[Math.random()*5|0]);
+        const child=childLetters.join('');
+        const cx=(this.x+other.x)/2,cy=(this.y+other.y)/2;
+        wordBirths.push({word:child,x:cx,y:cy});
+        this._justBred=30;other._justBred=30;
+      }
+    }}
 
   update(){
     this.age++;this.pulse+=.03;this.x+=this.vx;this.y+=this.vy;
     this.vx*=.98;this.vy*=.98;
+    if(this._justBred>0)this._justBred--;
     // Bounce off walls softly
     if(this.x<this.size){this.x=this.size;this.vx*=-.5;}
     if(this.x>W-this.size){this.x=W-this.size;this.vx*=-.5;}
@@ -75,7 +91,14 @@ class WordEntity{
     c.fillText(this.word,this.x,this.y);
     // Personality label
     c.globalAlpha=.1;c.font='7px sans-serif';
-    c.fillText(this.social>0?'friendly':this.social<0?'shy':'neutral',this.x,this.y+this.size+8);}
+    c.fillText(this.social>0?'friendly':this.social<0?'shy':'neutral',this.x,this.y+this.size+8);
+    // Birth glow
+    if(this.age<30){c.globalAlpha=.2*(1-this.age/30);c.fillStyle='#fff';
+      c.beginPath();c.arc(this.x,this.y,this.size*3,0,Math.PI*2);c.fill();}
+    // Aging fade
+    const maxAge=1500+this.word.length*300;
+    if(this.age>maxAge*.7){c.globalAlpha=.05*(1-(this.age-maxAge*.7)/(maxAge*.3));
+      c.strokeStyle='#ff4444';c.lineWidth=.5;c.beginPath();c.arc(this.x,this.y,this.size+5,0,Math.PI*2);c.stroke();}}
 }
 
 // Input
@@ -110,13 +133,25 @@ function anim(){requestAnimationFrame(anim);
   for(const s of bg){s.p+=.003;X.globalAlpha=.03+Math.sin(s.p)*.02;X.fillStyle='#fff';
     X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
   // Interactions
+  wordBirths=[];
   for(const e of entities){for(const o of entities){if(e!==o)e.interact(o);}e.update();}
+  // Process births
+  for(const b of wordBirths){
+    const child=new WordEntity(b.word,b.x,b.y);
+    child.vx=(Math.random()-.5)*3;child.vy=(Math.random()-.5)*3;
+    entities.push(child);totalBirths++;
+  }
+  // Death — old words fade (>2000 ticks for short words)
+  for(let i=entities.length-1;i>=0;i--){
+    const maxAge=1500+entities[i].word.length*300;
+    if(entities[i].age>maxAge){entities.splice(i,1);totalDeaths++;}
+  }
   drawConnections(X);
   for(const e of entities)e.draw(X);
   X.globalAlpha=1;
   const friendly=entities.filter(e=>e.social>0).length;
   const shy=entities.filter(e=>e.social<0).length;
-  document.getElementById('stats').textContent=entities.length+' words · '+friendly+' friendly · '+shy+' shy · Esc to clear';}
+  document.getElementById('stats').textContent=entities.length+' words · '+friendly+' friendly · '+shy+' shy · births:'+totalBirths+' deaths:'+totalDeaths;}
 anim();
 addEventListener('keydown',e=>{if(e.key==='f'&&!e.target.closest('input'))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
