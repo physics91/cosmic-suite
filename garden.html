@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Garden</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{overflow:hidden;cursor:pointer}
+    canvas{display:block}
+    #info{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;opacity:.1;font-family:'Segoe UI',sans-serif}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">click to plant</div>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.05);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr;</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;if(typeof SKY!=='undefined')redraw();}
+
+const m=new Date().getMonth();
+const season=m>=2&&m<=4?'spring':m>=5&&m<=7?'summer':m>=8&&m<=10?'autumn':'winter';
+const SKY={spring:[12,20,30],summer:[5,10,25],autumn:[18,10,5],winter:[8,10,18]};
+const GROUND={spring:'#1a2a12',summer:'#152210',autumn:'#1a1208',winter:'#0e1018'};
+const trees=[];
+
+function plant(x){
+  trees.push({x,height:.6+Math.random()*.4,lean:(Math.random()-.5)*.2,seed:Math.random()*1000});
+  redraw();
+}
+
+function drawTree(tx,baseY,height,lean,seed){
+  const h=H*height*.25;
+  function branch(x,y,angle,len,thick,depth){
+    if(depth>10||len<2)return;
+    const wind=Math.sin(Date.now()*.001+seed)*depth*.01;
+    const ex=x+Math.cos(angle+wind+lean)*len;
+    const ey=y+Math.sin(angle+wind+lean)*len;
+    X.strokeStyle=season==='winter'?'#554444':'#443322';
+    X.lineWidth=thick;X.lineCap='round';X.globalAlpha=.25+thick/12*.3;
+    X.beginPath();X.moveTo(x,y);X.lineTo(ex,ey);X.stroke();
+    if(depth>5&&season!=='winter'){
+      const colors={spring:['#ffaacc','#ff88aa','#ffccdd'],summer:['#338822','#44aa33','#55cc44'],autumn:['#dd7722','#cc5511','#eebb33']};
+      const cols=colors[season];
+      X.globalAlpha=.12+Math.random()*.08;X.fillStyle=cols[Math.random()*cols.length|0];
+      const sz=2+Math.random()*3;
+      X.beginPath();X.arc(ex+(Math.random()-.5)*4,ey+(Math.random()-.5)*4,sz,0,Math.PI*2);X.fill();
+    }
+    const shrink=.62+Math.random()*.1;const spread=.3+Math.random()*.25;
+    const jit=(Math.random()-.5)*.15;
+    branch(ex,ey,angle-spread+jit,len*shrink,thick*.68,depth+1);
+    branch(ex,ey,angle+spread+jit,len*shrink,thick*.68,depth+1);
+  }
+  branch(tx,baseY,-Math.PI/2+lean,h*.35,6,0);
+}
+
+function redraw(){
+  const bg=SKY[season];
+  X.fillStyle='rgb('+bg[0]+','+bg[1]+','+bg[2]+')';X.fillRect(0,0,W,H);
+  // Ground
+  X.fillStyle=GROUND[season];X.fillRect(0,H*.82,W,H*.18);
+  // Grass texture
+  X.globalAlpha=.03;
+  for(let i=0;i<W;i+=3){const gh=2+Math.random()*5;
+    X.fillStyle=season==='winter'?'#aabbcc':(season==='autumn'?'#886633':'#446622');
+    X.fillRect(i,H*.82-gh,1,gh);}
+  // Trees
+  for(const t of trees)drawTree(t.x,H*.82,t.height,t.lean,t.seed);
+  X.globalAlpha=1;
+  document.getElementById('info').textContent=trees.length+' trees \u00b7 '+season;
+  document.getElementById('info').style.color=season==='winter'?'#aabbcc':'#88aa66';
+}
+
+addEventListener('click',e=>{if(e.target.closest('a'))return;plant(e.clientX);});
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='c'){trees.length=0;redraw();}});
+
+// Gentle animation — wind sway
+function anim(){requestAnimationFrame(anim);
+  if(trees.length>0&&Date.now()%3===0)redraw();
+}
+anim();
+
+resize();addEventListener('resize',resize);
+// Start with a few trees
+for(let i=0;i<3;i++)plant(W*.2+Math.random()*W*.6);
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="garden.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
