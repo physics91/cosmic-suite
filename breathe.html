@@ -31,6 +31,7 @@
   <button class="btn" onclick="cyclePattern()">Pattern</button>
   <button class="btn" onclick="cycleTheme()">Theme</button>
   <button class="btn" onclick="toggleSound()">Sound</button>
+  <button class="btn" id="micBtn" onclick="toggleMic()">Mic</button>
 </div>
 <script>
 const C=document.getElementById('c'),X=C.getContext('2d');
@@ -86,6 +87,57 @@ function updateSound(){
 function toggleSound(){
   if(!soundOn){if(!aC)initSound();else aC.resume();soundOn=true;}
   else{soundOn=false;if(gainNode)gainNode.gain.setTargetAtTime(0,aC.currentTime,.1);}}
+
+// === MIC BREATH DETECTION ===
+let micOn=false,micStream=null,micAnalyser=null,micData=null;
+let breathVolume=0,breathSmooth=0,isBreathingIn=false;
+const cosmicBodies=[]; // stars/nebulae created by breath
+
+async function toggleMic(){
+  if(micOn){
+    micOn=false;document.getElementById('micBtn').classList.remove('on');
+    if(micStream)micStream.getTracks().forEach(t=>t.stop());
+    return;
+  }
+  try{
+    if(!aC){aC=new(AudioContext||webkitAudioContext)();}
+    micStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const src=aC.createMediaStreamSource(micStream);
+    micAnalyser=aC.createAnalyser();micAnalyser.fftSize=256;
+    src.connect(micAnalyser);
+    micData=new Uint8Array(micAnalyser.frequencyBinCount);
+    micOn=true;document.getElementById('micBtn').classList.add('on');
+  }catch(e){micOn=false;}
+}
+
+function readBreath(){
+  if(!micOn||!micAnalyser)return;
+  micAnalyser.getByteTimeDomainData(micData);
+  let sum=0;
+  for(let i=0;i<micData.length;i++){const v=(micData[i]-128)/128;sum+=v*v;}
+  breathVolume=Math.sqrt(sum/micData.length);
+  const prev=breathSmooth;
+  breathSmooth+=(breathVolume-breathSmooth)*.1;
+  // Detect breath direction: rising volume = exhale, falling = inhale (nasal)
+  const rising=breathSmooth>prev+.001;
+  const wasIn=isBreathingIn;
+  isBreathingIn=!rising&&breathSmooth<.05;
+  // Spawn cosmic bodies on breath transitions
+  if(wasIn&&!isBreathingIn&&breathSmooth>.02){
+    // Exhale start → spawn nebula
+    const angle=Math.random()*Math.PI*2;
+    const dist=100+Math.random()*200;
+    cosmicBodies.push({type:'nebula',x:W/2+Math.cos(angle)*dist,y:H/2+Math.sin(angle)*dist,
+      size:10+breathSmooth*200,life:1,hue:Math.random()*360,born:Date.now()});
+  }
+  if(!wasIn&&isBreathingIn){
+    // Inhale start → spawn star
+    const angle=Math.random()*Math.PI*2;
+    const dist=50+Math.random()*150;
+    cosmicBodies.push({type:'star',x:W/2+Math.cos(angle)*dist,y:H/2+Math.sin(angle)*dist,
+      size:2+Math.random()*3,life:1,hue:30+Math.random()*30,born:Date.now()});
+  }
+}
 
 // Particles
 const particles=[];for(let i=0;i<200;i++){
@@ -177,6 +229,36 @@ function anim(){requestAnimationFrame(anim);
   for(let i=0;i<50;i++){const x=(Math.sin(i*127.1+Date.now()*.00003)*.5+.5)*W;
     const y=(Math.cos(i*311.7+Date.now()*.00002)*.5+.5)*H;
     X.beginPath();X.arc(x,y,.5+Math.sin(Date.now()*.002+i)*.3,0,Math.PI*2);X.fill();}
+
+  // === MIC BREATH VISUALIZATION ===
+  readBreath();
+  // Breath volume ring
+  if(micOn){
+    const bR=mainR*(1+breathSmooth*3);
+    X.globalAlpha=breathSmooth*.5;X.strokeStyle=th2.accent;X.lineWidth=1+breathSmooth*10;
+    X.beginPath();X.arc(cx,cy,bR,0,Math.PI*2);X.stroke();
+  }
+  // Cosmic bodies spawned by breath
+  for(let i=cosmicBodies.length-1;i>=0;i--){
+    const b=cosmicBodies[i];
+    b.life-=.003;
+    if(b.life<=0){cosmicBodies.splice(i,1);continue;}
+    if(b.type==='nebula'){
+      b.size+=.3; // nebula expands
+      X.globalAlpha=b.life*.08;
+      const ng=X.createRadialGradient(b.x,b.y,0,b.x,b.y,b.size);
+      ng.addColorStop(0,'hsla('+b.hue+',60%,40%,.2)');
+      ng.addColorStop(1,'hsla('+b.hue+',60%,20%,0)');
+      X.fillStyle=ng;X.beginPath();X.arc(b.x,b.y,b.size,0,Math.PI*2);X.fill();
+    }else{
+      // Star — twinkle
+      X.globalAlpha=b.life*(.3+Math.sin(Date.now()*.01+b.hue)*.1);
+      X.fillStyle='hsl('+b.hue+',80%,80%)';
+      X.beginPath();X.arc(b.x,b.y,b.size*b.life,0,Math.PI*2);X.fill();
+      X.globalAlpha=b.life*.05;
+      X.beginPath();X.arc(b.x,b.y,b.size*3,0,Math.PI*2);X.fill();
+    }
+  }
   X.globalAlpha=1;}
 
 addEventListener('click',e=>{if(!e.target.closest('#controls'))if(!active)toggle();});
