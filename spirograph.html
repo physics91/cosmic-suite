@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spirograph</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='8' fill='none' stroke='%2344ffaa' stroke-width='.5' opacity='.4'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#030308;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #params{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:10;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+    #params label{color:rgba(255,255,255,.2);font-size:8px;display:flex;gap:4px;align-items:center;letter-spacing:1px}
+    #params input{width:80px;accent-color:#44ffaa}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">SPIROGRAPH &middot; GEARS WITHIN GEARS</div>
+<div id="params">
+  <label>R <input type="range" id="rR" min="50" max="200" value="120"><span id="rRV">120</span></label>
+  <label>r <input type="range" id="rr" min="10" max="100" value="45"><span id="rrV">45</span></label>
+  <label>d <input type="range" id="rd" min="10" max="150" value="80"><span id="rdV">80</span></label>
+  <label>speed <input type="range" id="rSpd" min="1" max="20" value="5"><span id="rSpdV">5</span></label>
+</div>
+<button class="btn" style="bottom:16px;right:16px" onclick="reset()">New</button>
+<button class="btn" style="bottom:16px;right:65px" onclick="randomize()">Random</button>
+<button class="btn" style="bottom:16px;right:135px" onclick="gallery()">Gallery</button>
+<button class="btn" style="bottom:16px;right:200px" onclick="cycleColor()">Color: <span id="colName">Emerald</span></button>
+<button class="btn" style="bottom:16px;right:310px" onclick="toggleGears()"><span id="gearLabel">Gears ON</span></button>
+<button class="btn" style="bottom:16px;right:400px" onclick="exportPNG()">Export</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="portal.html" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>document.getElementById('random-jump').onclick=function(){const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chaos-map.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','order.html','pendulum.html','pi.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false;};</script>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+
+let R=120,r=45,d=80,spd=5;
+let t=0,drawing=true,showGears=true;
+
+const COLORS=[
+  {name:'Emerald',fn:t=>'hsla('+(140+t*.3)+',70%,'+(50+Math.sin(t*.01)*10)+'%,'},
+  {name:'Sunset',fn:t=>'hsla('+(30+t*.5)+',80%,'+(45+Math.sin(t*.01)*15)+'%,'},
+  {name:'Violet',fn:t=>'hsla('+(270+t*.2)+',60%,'+(50+Math.sin(t*.01)*10)+'%,'},
+  {name:'Rainbow',fn:t=>'hsla('+(t*.8%360)+',65%,55%,'},
+  {name:'Silver',fn:t=>'hsla(220,5%,'+(40+Math.sin(t*.01)*20)+'%,'},
+];
+let colorIdx=0;
+function cycleColor(){colorIdx=(colorIdx+1)%COLORS.length;document.getElementById('colName').textContent=COLORS[colorIdx].name;reset();}
+
+const GALLERY=[
+  {R:120,r:45,d:80},{R:150,r:30,d:90},{R:100,r:67,d:50},
+  {R:180,r:25,d:120},{R:120,r:72,d:72},{R:140,r:35,d:100},
+  {R:100,r:50,d:100},{R:160,r:40,d:60},
+];
+let galleryIdx=0;
+
+function readParams(){
+  R=+document.getElementById('rR').value;
+  r=+document.getElementById('rr').value;
+  d=+document.getElementById('rd').value;
+  spd=+document.getElementById('rSpd').value;
+  document.getElementById('rRV').textContent=R;
+  document.getElementById('rrV').textContent=r;
+  document.getElementById('rdV').textContent=d;
+  document.getElementById('rSpdV').textContent=spd;
+}
+
+function resize(){W=C.width=innerWidth;H=C.height=innerHeight;reset();}
+resize();addEventListener('resize',resize);
+
+function reset(){readParams();t=0;drawing=true;X.fillStyle='rgba(3,3,8,1)';X.fillRect(0,0,W,H);}
+function randomize(){
+  document.getElementById('rR').value=50+Math.random()*150|0;
+  document.getElementById('rr').value=10+Math.random()*90|0;
+  document.getElementById('rd').value=10+Math.random()*140|0;
+  reset();
+}
+function gallery(){
+  const p=GALLERY[galleryIdx%GALLERY.length];galleryIdx++;
+  document.getElementById('rR').value=p.R;
+  document.getElementById('rr').value=p.r;
+  document.getElementById('rd').value=p.d;
+  reset();
+}
+function toggleGears(){showGears=!showGears;document.getElementById('gearLabel').textContent=showGears?'Gears ON':'Gears OFF';}
+function exportPNG(){const l=document.createElement('a');l.download='spirograph_'+Date.now()+'.png';l.href=C.toDataURL();l.click();}
+
+document.querySelectorAll('#params input').forEach(el=>{el.oninput=()=>{reset();};});
+
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();randomize();}
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='g')toggleGears();
+});
+
+// === SPIROGRAPH MATH ===
+// Hypotrochoid: x = (R-r)*cos(t) + d*cos((R-r)/r * t)
+//               y = (R-r)*sin(t) - d*sin((R-r)/r * t)
+function getPoint(t){
+  const diff=R-r;
+  const ratio=diff/r;
+  return{
+    x:diff*Math.cos(t)+d*Math.cos(ratio*t),
+    y:diff*Math.sin(t)-d*Math.sin(ratio*t),
+  };
+}
+
+// How many rotations until pattern repeats?
+function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){const t2=b;b=a%t2;a=t2;}return a;}
+function getLoops(){return r/gcd(R,r);}
+
+let prevX=null,prevY=null;
+
+function anim(){requestAnimationFrame(anim);
+  if(!drawing)return;
+
+  const cx=W/2,cy=H/2;
+  const colorFn=COLORS[colorIdx].fn;
+  const stepsPerFrame=spd*3;
+  const totalLoops=getLoops();
+  const maxT=totalLoops*Math.PI*2;
+
+  for(let s=0;s<stepsPerFrame;s++){
+    if(t>maxT+.1){drawing=false;break;}
+    const p=getPoint(t);
+    const sx=cx+p.x,sy=cy+p.y;
+
+    if(prevX!==null){
+      const alpha=.5;
+      X.strokeStyle=colorFn(t)+alpha+')';
+      X.lineWidth=.8;
+      X.beginPath();X.moveTo(prevX,prevY);X.lineTo(sx,sy);X.stroke();
+    }
+    prevX=sx;prevY=sy;
+    t+=.02;
+  }
+
+  // Draw gears (animated)
+  if(showGears&&drawing){
+    // Clear gear area with semi-transparent overlay
+    // Outer gear
+    X.globalAlpha=.04;X.strokeStyle='rgba(255,255,255,.3)';X.lineWidth=.5;
+    X.beginPath();X.arc(cx,cy,R,0,Math.PI*2);X.stroke();
+    // Inner gear position
+    const diff=R-r;
+    const gearCx=cx+diff*Math.cos(t);
+    const gearCy=cy+diff*Math.sin(t);
+    X.beginPath();X.arc(gearCx,gearCy,r,0,Math.PI*2);X.stroke();
+    // Pen arm
+    const ratio=diff/r;
+    const penX=gearCx+d*Math.cos(ratio*t);
+    const penY=gearCy-d*Math.sin(ratio*t);
+    X.globalAlpha=.06;X.strokeStyle='rgba(255,200,100,.4)';
+    X.beginPath();X.moveTo(gearCx,gearCy);X.lineTo(penX,penY);X.stroke();
+    // Pen dot
+    X.globalAlpha=.2;X.fillStyle='#ffcc44';
+    X.beginPath();X.arc(penX,penY,2,0,Math.PI*2);X.fill();
+    X.globalAlpha=1;
+  }
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="spirograph.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
