@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chaos Map</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='6' y='6' width='20' height='20' fill='url(%23g)' opacity='.5'/><defs><linearGradient id='g'><stop stop-color='%23ff4444'/><stop offset='1' stop-color='%234444ff'/></linearGradient></defs></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #desc{position:fixed;top:36px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.08);font-size:9px;z-index:2;pointer-events:none;max-width:500px;text-align:center}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    #progress{position:fixed;bottom:16px;right:16px;color:rgba(255,255,255,.1);font-size:9px;z-index:2;pointer-events:none}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">CHAOS MAP &middot; WHERE DOES THE PENDULUM FLIP?</div>
+<div id="desc">Each pixel is a double pendulum with different initial angles. Color = time to first flip. The boundary between order and chaos is infinitely complex.</div>
+<div id="stats"></div>
+<div id="progress"></div>
+<button class="btn" style="bottom:16px;right:100px" onclick="restart()">Restart</button>
+<button class="btn" style="bottom:16px;right:165px" onclick="cycleColor()">Color: <span id="colName">Inferno</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="portal.html" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>document.getElementById('random-jump').onclick=function(){const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','order.html','pendulum.html','pi.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false;};</script>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+
+const RES=3; // pixel resolution
+let cols,rows,flipTimes;
+let computing=false,currentRow=0,maxFlipTime=0;
+
+const COLORS=[
+  {name:'Inferno',fn:t=>{const v=Math.min(1,t);return[Math.min(255,v*300),Math.min(255,v*100+v*v*150),Math.min(255,v*v*v*255)];}},
+  {name:'Viridis',fn:t=>{const v=Math.min(1,t);return[Math.min(255,70*v),Math.min(255,50+v*200),Math.min(255,80+v*100)];}},
+  {name:'Plasma',fn:t=>{const v=Math.min(1,t);return[Math.min(255,30+v*225),Math.min(255,v*v*180),Math.min(255,200-v*100+v*v*100)];}},
+  {name:'Ice',fn:t=>{const v=Math.min(1,t);return[Math.min(255,v*v*100),Math.min(255,v*200),Math.min(255,100+v*155)];}},
+];
+let colorIdx=0;
+function cycleColor(){colorIdx=(colorIdx+1)%COLORS.length;document.getElementById('colName').textContent=COLORS[colorIdx].name;renderMap();}
+
+function resize(){
+  W=C.width=innerWidth;H=C.height=innerHeight;
+  cols=Math.ceil(W/RES);rows=Math.ceil(H/RES);
+  restart();
+}
+resize();addEventListener('resize',resize);
+
+// === DOUBLE PENDULUM FLIP TIME ===
+function simulateFlip(a1,a2){
+  const L1=1,L2=1,m1=1,m2=1,g=9.81,dt=.02;
+  let t1=a1,t2=a2,v1=0,v2=0;
+  const maxSteps=500;
+  for(let step=0;step<maxSteps;step++){
+    const da=t1-t2;
+    const den=2*m1+m2-m2*Math.cos(2*da);
+    const acc1=(-g*(2*m1+m2)*Math.sin(t1)-m2*g*Math.sin(t1-2*t2)-2*Math.sin(da)*m2*(v2*v2*L2+v1*v1*L1*Math.cos(da)))/(L1*den);
+    const acc2=(2*Math.sin(da)*(v1*v1*L1*(m1+m2)+g*(m1+m2)*Math.cos(t1)+v2*v2*L2*m2*Math.cos(da)))/(L2*den);
+    v1+=acc1*dt;v2+=acc2*dt;
+    t1+=v1*dt;t2+=v2*dt;
+    // Check flip — did either angle cross ±π?
+    if(Math.abs(t1)>Math.PI||Math.abs(t2)>Math.PI)return step;
+  }
+  return maxSteps; // never flipped
+}
+
+function restart(){
+  flipTimes=new Float32Array(cols*rows);
+  computing=true;currentRow=0;maxFlipTime=0;
+  X.fillStyle='#000';X.fillRect(0,0,W,H);
+}
+
+// Compute rows progressively
+function computeRows(count){
+  for(let r=0;r<count&&currentRow<rows;r++){
+    for(let x=0;x<cols;x++){
+      // Map pixel to angle space: -π to π for both angles
+      const a1=-Math.PI+x/cols*Math.PI*2;
+      const a2=-Math.PI+currentRow/rows*Math.PI*2;
+      const ft=simulateFlip(a1,a2);
+      flipTimes[currentRow*cols+x]=ft;
+      if(ft>maxFlipTime)maxFlipTime=ft;
+    }
+    currentRow++;
+  }
+  if(currentRow>=rows)computing=false;
+}
+
+// === RENDER ===
+const offC=document.createElement('canvas');
+const offX=offC.getContext('2d');
+
+function renderMap(){
+  offC.width=cols;offC.height=rows;
+  const imgData=new ImageData(cols,rows);
+  const d=imgData.data;
+  const colorFn=COLORS[colorIdx].fn;
+  const scale=maxFlipTime||1;
+
+  for(let i=0;i<cols*rows;i++){
+    const pi=i*4;
+    const t=flipTimes[i]/scale;
+    if(flipTimes[i]>=500){// Never flipped — dark
+      d[pi]=5;d[pi+1]=5;d[pi+2]=15;
+    }else{
+      const [r,g,b]=colorFn(t);
+      d[pi]=r;d[pi+1]=g;d[pi+2]=b;
+    }
+    d[pi+3]=255;
+  }
+  offX.putImageData(imgData,0,0);
+  X.imageSmoothingEnabled=true;
+  X.drawImage(offC,0,0,cols,rows,0,0,W,H);
+}
+
+function anim(){
+  requestAnimationFrame(anim);
+  if(computing){
+    computeRows(2); // 2 rows per frame
+    renderMap();
+    document.getElementById('progress').textContent=
+      Math.round(currentRow/rows*100)+'% computed';
+  }
+  document.getElementById('stats').textContent=
+    'resolution: '+cols+'x'+rows+
+    '\nmax flip: '+maxFlipTime+' steps'+
+    '\n'+(!computing?'complete':'computing...');
+}
+anim();
+
+addEventListener('keydown',e=>{
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='r')restart();
+});
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="chaos-map.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
