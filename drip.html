@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drip</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='20' r='3' fill='%23ff6644' opacity='.4'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0a0a0a;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.1);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">CLICK TO DRIP &middot; DRAG TO POUR &middot; TILT WITH ARROWS</div>
+<button class="btn" style="bottom:16px;right:16px" onclick="clear_()">Clear</button>
+<button class="btn" style="bottom:16px;right:70px" onclick="cycleColor()">Color: <span id="colV">Blood</span></button>
+<button class="btn" style="bottom:16px;right:175px" onclick="cycleViscosity()">Viscosity: <span id="visV">Medium</span></button>
+<button class="btn" style="bottom:16px;right:310px" onclick="rain()">Rain</button>
+<button class="btn" style="bottom:16px;right:360px" onclick="exportPNG()">Save</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="portal.html" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>document.getElementById('random-jump').onclick=function(){const e=['about.html','ant.html','art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chaos-map.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-life.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','maze.html','memory.html','music.html','neural.html','oracle.html','orbit.html','orbits.html','order.html','pendulum.html','pi.html','puzzle.html','quine.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','spirograph.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false;};</script>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;X.fillStyle='#0a0a0a';X.fillRect(0,0,W,H);}
+resize();addEventListener('resize',resize);
+
+const drops=[];
+let gravX=0,gravY=.3;
+let viscosity=.97;
+const VISCOSITIES=[{name:'Water',v:.99},{name:'Medium',v:.97},{name:'Honey',v:.92}];
+let visIdx=1;
+
+const PALETTES=[
+  {name:'Blood',colors:['#cc2200','#ff4422','#ff6644','#990000','#660000']},
+  {name:'Ink',colors:['#111','#222','#333','#1a1a2e','#0a0a15']},
+  {name:'Neon',colors:['#ff00ff','#00ffff','#ff0088','#00ff88','#ffff00']},
+  {name:'Earth',colors:['#8b4513','#a0522d','#d2691e','#daa520','#556b2f']},
+  {name:'Ocean',colors:['#003366','#004488','#0066aa','#0088cc','#00aaee']},
+];
+let palIdx=0;
+
+function cycleColor(){palIdx=(palIdx+1)%PALETTES.length;document.getElementById('colV').textContent=PALETTES[palIdx].name;}
+function cycleViscosity(){visIdx=(visIdx+1)%VISCOSITIES.length;viscosity=VISCOSITIES[visIdx].v;document.getElementById('visV').textContent=VISCOSITIES[visIdx].name;}
+function clear_(){X.fillStyle='#0a0a0a';X.fillRect(0,0,W,H);drops.length=0;}
+function exportPNG(){const l=document.createElement('a');l.download='drip_'+Date.now()+'.png';l.href=C.toDataURL();l.click();}
+
+function spawnDrop(x,y,count){
+  const pal=PALETTES[palIdx].colors;
+  for(let i=0;i<count;i++){
+    drops.push({
+      x:x+(Math.random()-.5)*8,y:y+(Math.random()-.5)*8,
+      vx:(Math.random()-.5)*2,vy:Math.random()*1,
+      size:1+Math.random()*3,
+      color:pal[Math.random()*pal.length|0],
+      life:200+Math.random()*300,
+    });
+  }
+}
+
+function rain(){
+  for(let i=0;i<50;i++){
+    spawnDrop(Math.random()*W,Math.random()*H*.3,1);
+  }
+}
+
+// Input
+let pouring=false;
+C.addEventListener('mousedown',e=>{pouring=true;spawnDrop(e.clientX,e.clientY,8);});
+C.addEventListener('mousemove',e=>{if(pouring)spawnDrop(e.clientX,e.clientY,3);});
+addEventListener('mouseup',()=>{pouring=false;});
+C.addEventListener('touchstart',e=>{e.preventDefault();pouring=true;spawnDrop(e.touches[0].clientX,e.touches[0].clientY,8);},{passive:false});
+C.addEventListener('touchmove',e=>{e.preventDefault();if(pouring)spawnDrop(e.touches[0].clientX,e.touches[0].clientY,3);},{passive:false});
+C.addEventListener('touchend',()=>{pouring=false;});
+
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft')gravX=-.15;
+  if(e.key==='ArrowRight')gravX=.15;
+  if(e.key==='ArrowUp'){gravY=-.3;gravX=0;}
+  if(e.key==='ArrowDown'){gravY=.3;gravX=0;}
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='c')clear_();
+  if(e.key==='r')rain();
+});
+addEventListener('keyup',e=>{
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight')gravX=0;
+});
+
+// === RENDER ===
+function anim(){requestAnimationFrame(anim);
+
+  for(let i=drops.length-1;i>=0;i--){
+    const d=drops[i];
+    d.vx+=gravX+((Math.random()-.5)*.1);
+    d.vy+=gravY;
+    d.vx*=viscosity;d.vy*=viscosity;
+    d.x+=d.vx;d.y+=d.vy;
+    d.life--;d.size*=.999;
+
+    // Draw
+    X.globalAlpha=Math.min(.6,d.life/100);
+    X.fillStyle=d.color;
+    X.beginPath();X.arc(d.x,d.y,d.size,0,Math.PI*2);X.fill();
+
+    // Splatter on edges
+    if(d.y>H-5||d.y<5||d.x<5||d.x>W-5){
+      for(let s=0;s<3;s++){
+        X.globalAlpha=.2;
+        X.beginPath();X.arc(d.x+(Math.random()-.5)*10,d.y+(Math.random()-.5)*10,d.size*.5,0,Math.PI*2);X.fill();
+      }
+      d.life=0;
+    }
+
+    if(d.life<=0||d.size<.2)drops.splice(i,1);
+  }
+  X.globalAlpha=1;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="drip.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
