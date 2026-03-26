@@ -117,6 +117,7 @@ function exportArt(){const l=document.createElement('a');l.download=`gravity_art
 // Render
 let artPaused=false;
 addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();artPaused=!artPaused;}
+  if(e.key==='i'){artX.globalCompositeOperation='difference';artX.fillStyle='#fff';artX.fillRect(0,0,W,H);artX.globalCompositeOperation='source-over';}
   if(e.key==='p'){currentPalette=(currentPalette+1)%PALETTES.length;buildPalette();}
   if(e.key==='s')symm=!symm;if(e.key==='c')clearArt();if(e.key==='r')randomWells();if(e.key==='x')clearWells();});
 let _af=0,_at=0,_afps=0;
