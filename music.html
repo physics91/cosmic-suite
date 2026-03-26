@@ -46,6 +46,7 @@
   <button class="btn" onclick="tapTempo()">Tap</button>
   <button class="btn" onclick="exportMidi()">Export</button>
   <button class="btn" id="micBtn" onclick="toggleMicInput()">Mic OFF</button>
+  <button class="btn" id="circBtn" onclick="circularMode=!circularMode;this.classList.toggle('active')">Circular</button>
 </div>
 <canvas id="c"></canvas>
 <script>
@@ -71,7 +72,7 @@ const SCALES={
   blues:[0,3,5,6,7,10]};
 
 // Stars
-let stars=[],playing=false,playPos=0,bpm=80,lastBeat=0,octave=0,reverse=false,loops=0,pingpong=false;
+let stars=[],playing=false,playPos=0,bpm=80,lastBeat=0,octave=0,reverse=false,loops=0,pingpong=false,circularMode=false;
 
 class MusicStar{
   constructor(x,y){this.x=x;this.y=y;this.sz=3+Math.random()*3;this.hue=Math.random()*360;
@@ -213,29 +214,74 @@ function anim(){requestAnimationFrame(anim);
   for(const s of bgStars){s.p+=.008;X.globalAlpha=.08+Math.sin(s.p)*.05;X.fillStyle='#fff';
     X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
   X.globalAlpha=1;
-  drawGrid(X);
-  // Playhead
-  if(playing){const now=performance.now();const beatInterval=60000/bpm/4;// 16th notes
+  // Playhead advance (shared between modes)
+  if(playing){const now=performance.now();const beatInterval=60000/bpm/4;
     if(now-lastBeat>beatInterval){lastBeat=now;const prev=playPos;playPos=reverse?(playPos+15)%16:(playPos+1)%16;if(!reverse&&playPos===0&&prev===15){loops++;if(pingpong)reverse=true;}
       if(reverse&&playPos===15&&prev===0){loops++;if(pingpong)reverse=false;}
-      // Trigger stars in this column
-      for(const s of stars){const info=s.getNoteInfo();if(info.col===playPos){s.play();s.ripple=30;}}}
-    const ph=$('playhead');ph.style.left=(playPos/16*100)+'%';}
-  // Stars
-  for(const s of stars){s.update();s.draw(X);
-    if(s.ripple>0){X.globalAlpha=(s.ripple/30)*.1;X.strokeStyle='#fff';X.lineWidth=.5;
-      X.beginPath();X.arc(s.x,s.y,(30-s.ripple)*2,0,Math.PI*2);X.stroke();s.ripple--;}}
-  // Mic pitch detection
-  if(micOn&&playing&&Date.now()%300<20)detectPitch();
-  // Column density dots
-  for(let col=0;col<16;col++){let count=0;for(const s of stars){if(s.getNoteInfo().col===col)count++;}
-    if(count)for(let d=0;d<Math.min(count,5);d++){X.globalAlpha=.08;X.fillStyle='#ffcc44';X.beginPath();X.arc(col*W/16+W/32,H-8-d*4,1.5,0,Math.PI*2);X.fill();}}
-  // Playhead column highlight
-  if(playing){X.globalAlpha=.03;X.fillStyle='#ffcc44';X.fillRect(playPos*W/16,0,W/16,H);}
-  // Scale guide — highlight root note rows
-  const curScale=SCALES[$('scaleSelect').value]||SCALES.minor;
-  for(let i=0;i<24;i++){if(curScale.includes(i%12)){const ny=H-i*H/24;
-    X.globalAlpha=i%12===0?.03:.01;X.fillStyle='#ffcc44';X.fillRect(0,ny-H/48,W,H/24);}}
+      for(const s of stars){const info=s.getNoteInfo();if(info.col===playPos){s.play();s.ripple=30;}}}}
+
+  if(!circularMode){
+    // === LINEAR MODE ===
+    drawGrid(X);
+    if(playing){const ph=$('playhead');ph.style.left=(playPos/16*100)+'%';}else{$('playhead').style.left='-10px';}
+    for(const s of stars){s.update();s.draw(X);
+      if(s.ripple>0){X.globalAlpha=(s.ripple/30)*.1;X.strokeStyle='#fff';X.lineWidth=.5;
+        X.beginPath();X.arc(s.x,s.y,(30-s.ripple)*2,0,Math.PI*2);X.stroke();s.ripple--;}}
+    if(micOn&&playing&&Date.now()%300<20)detectPitch();
+    for(let col=0;col<16;col++){let count=0;for(const s of stars){if(s.getNoteInfo().col===col)count++;}
+      if(count)for(let d=0;d<Math.min(count,5);d++){X.globalAlpha=.08;X.fillStyle='#ffcc44';X.beginPath();X.arc(col*W/16+W/32,H-8-d*4,1.5,0,Math.PI*2);X.fill();}}
+    if(playing){X.globalAlpha=.03;X.fillStyle='#ffcc44';X.fillRect(playPos*W/16,0,W/16,H);}
+    const curScale=SCALES[$('scaleSelect').value]||SCALES.minor;
+    for(let i=0;i<24;i++){if(curScale.includes(i%12)){const ny=H-i*H/24;
+      X.globalAlpha=i%12===0?.03:.01;X.fillStyle='#ffcc44';X.fillRect(0,ny-H/48,W,H/24);}}
+  }else{
+    // === CIRCULAR MODE ===
+    $('playhead').style.left='-10px';
+    const cx=W/2,cy=H/2;
+    const maxR=Math.min(W,H)*.42;
+    // Circular beat rings
+    for(let ring=0;ring<4;ring++){
+      const r=maxR*(.3+ring*.2);
+      X.globalAlpha=.02;X.strokeStyle='#fff';X.lineWidth=.5;
+      X.beginPath();X.arc(cx,cy,r,0,Math.PI*2);X.stroke();
+    }
+    // Beat markers on outer ring
+    for(let i=0;i<16;i++){
+      const a=-Math.PI/2+i*Math.PI*2/16;
+      const r1=maxR*.95,r2=maxR*1.02;
+      X.globalAlpha=i%4===0?.08:.03;X.strokeStyle='#fff';X.lineWidth=i%4===0?1:.5;
+      X.beginPath();X.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);X.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);X.stroke();
+    }
+    // Playhead sweep
+    if(playing){
+      const headAngle=-Math.PI/2+playPos*Math.PI*2/16;
+      X.globalAlpha=.06;X.strokeStyle='#ffcc44';X.lineWidth=2;
+      X.beginPath();X.moveTo(cx,cy);X.lineTo(cx+Math.cos(headAngle)*maxR,cy+Math.sin(headAngle)*maxR);X.stroke();
+      // Sweep glow
+      X.globalAlpha=.02;
+      X.beginPath();X.moveTo(cx,cy);X.arc(cx,cy,maxR,headAngle-.1,headAngle+.1);X.closePath();X.fillStyle='#ffcc44';X.fill();
+    }
+    // Stars mapped to circular positions
+    for(const s of stars){
+      s.update();
+      const info=s.getNoteInfo();
+      const angle=-Math.PI/2+info.col*Math.PI*2/16;
+      const dist=maxR*(.2+info.vel*.7); // vel=row position -> radius
+      const sx=cx+Math.cos(angle)*dist;
+      const sy=cy+Math.sin(angle)*dist;
+      // Draw at circular position
+      X.globalAlpha=.06+s.glow*.2;
+      X.fillStyle='hsl('+s.hue+',60%,60%)';
+      X.beginPath();X.arc(sx,sy,s.sz*4+s.glow*15,0,Math.PI*2);X.fill();
+      X.globalAlpha=.7+s.glow*.3;X.fillStyle='#fff';
+      X.beginPath();X.arc(sx,sy,s.sz+s.glow*3,0,Math.PI*2);X.fill();
+      if(s.ripple>0){X.globalAlpha=(s.ripple/30)*.1;X.strokeStyle='#fff';X.lineWidth=.5;
+        X.beginPath();X.arc(sx,sy,(30-s.ripple)*2,0,Math.PI*2);X.stroke();s.ripple--;}
+    }
+    // Center label
+    X.globalAlpha=.06;X.fillStyle='#fff';X.font='8px sans-serif';X.textAlign='center';
+    X.fillText('CIRCULAR',cx,cy);
+  }
   X.globalAlpha=1;
   // Star count
   // Show last played note
