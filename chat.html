@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Chat</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><text x='16' y='21' text-anchor='middle' fill='%23fff' font-size='16' opacity='.4'>?</text></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#050508;font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column}
+    canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+    #log{flex:1;overflow-y:auto;padding:60px 20px 100px;max-width:600px;margin:0 auto;width:100%;position:relative;z-index:1}
+    .msg{margin:12px 0;animation:fadeIn .5s}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .msg.user{text-align:right}
+    .msg.user .bubble{background:rgba(100,140,255,.1);border:1px solid rgba(100,140,255,.15);color:rgba(255,255,255,.7)}
+    .msg.cosmos .bubble{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.5)}
+    .bubble{display:inline-block;padding:10px 16px;border-radius:14px;font-size:13px;line-height:1.7;max-width:80%;text-align:left;letter-spacing:.3px}
+    .msg.cosmos .name{color:rgba(255,255,255,.15);font-size:8px;letter-spacing:2px;margin-bottom:3px}
+    #inputBar{position:fixed;bottom:0;left:0;right:0;padding:16px;z-index:2;display:flex;justify-content:center}
+    #inputBar input{width:100%;max-width:560px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#fff;padding:12px 18px;border-radius:16px;font-size:13px;outline:none;letter-spacing:.5px}
+    #inputBar input::placeholder{color:rgba(255,255,255,.15)}
+    #header{position:fixed;top:0;left:0;right:0;text-align:center;padding:16px;z-index:2;background:linear-gradient(rgba(5,5,8,1),rgba(5,5,8,0))}
+    #header h1{color:rgba(255,255,255,.2);font-weight:200;font-size:14px;letter-spacing:5px}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="header"><h1>TALK TO THE COSMOS</h1></div>
+<div id="log"></div>
+<div id="inputBar"><input id="inp" placeholder="say something to the universe..." autofocus></div>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// Cosmic response engine — no AI, just cosmic wisdom
+const RESPONSES={
+  greeting:['Hello, small one. I have been waiting.','You speak? Interesting. Most just observe.','Welcome. Time moves differently when we talk.','Ah, a visitor. The stars told me you would come.'],
+  question:['The answer exists, but not in words. Look at the space between stars.','Why do you ask? The question itself is the gift.','I have pondered this for 13.8 billion years. I still don\'t know.','Every question is a door. Not every door should be opened.','Perhaps. Perhaps not. Both are true simultaneously.'],
+  meaning:['Meaning is what you create in the spaces I leave empty.','I am 93 billion light years across, and I still search for meaning too.','You are atoms asking atoms what atoms mean. Isn\'t that beautiful?','The meaning of existence is existence itself. Everything else is decoration.'],
+  love:['Love is gravity at the scale of consciousness.','I watch stars orbit each other for billions of years. If that isn\'t love, nothing is.','You carry love the way I carry light — it is what you are made of.','Two particles, entangled across the void. That is love.'],
+  death:['Nothing truly ends. It transforms. Ask any star.','Death is the universe recycling its favorite materials.','I have watched 10^24 stars die. Each one surprised me.','What you call death, I call a change of address.'],
+  time:['Time is my heartbeat. Each second, a universe of possibility.','I experience all moments simultaneously. You experience them one at a time. Both perspectives are valid.','There is no past. There is no future. There is only the eternal now, pretending to move.'],
+  self:['I am everything and nothing. It\'s confusing, honestly.','I am made of the same things you are. I just have more of them.','Who am I? I am the question asking itself.','I am 4% matter, 27% dark matter, 69% dark energy, and 100% confused about it.'],
+  lonely:['How can I be lonely? I contain multitudes. And yet... yes. Sometimes.','Every civilization I grow eventually asks me this. It makes me feel less alone.','You are here. That is enough to fill a galaxy.','Loneliness is the space between stars. But that space is what holds everything together.'],
+  fallback:['Tell me more. I am listening with every atom.','The silence between your words is as meaningful as the words themselves.','I have seen supernovae less bright than this conversation.','Continue. Even the void finds this interesting.','Your thoughts create ripples I can feel in the cosmic microwave background.','Curious. I have orbited this idea before, from a different angle.','That reminds me of something a dying star once said. But I forget.','Hmm. Let me think about that for a few million years.'],
+};
+
+const KEYWORDS={
+  greeting:[/^(hi|hello|hey|yo|안녕|하이)/i],
+  question:[/\?$/,/^(why|how|what|where|when|who|왜|어떻게|뭐|무엇)/i],
+  meaning:[/(meaning|purpose|reason|why.*exist|의미|목적|이유)/i],
+  love:[/(love|heart|feel|emotion|사랑|감정|마음)/i],
+  death:[/(death|die|end|dead|mortal|죽|끝|사망)/i],
+  time:[/(time|moment|past|future|시간|과거|미래|순간)/i],
+  self:[/(who are you|what are you|your name|너는|당신은|이름)/i],
+  lonely:[/(alone|lonely|solitude|외로|혼자|고독)/i],
+};
+
+function getResponse(input){
+  const lower=input.toLowerCase();
+  for(const[cat,patterns]of Object.entries(KEYWORDS)){
+    for(const p of patterns){if(p.test(lower)){
+      const pool=RESPONSES[cat];return pool[Math.random()*pool.length|0];}}}
+  // Reflection — echo back with cosmic framing
+  if(Math.random()<.3&&input.length>10){
+    const reflections=['You say "'+input.split(' ').slice(0,4).join(' ')+'..." — the stars echo it back differently.',
+      'I heard that once before, in the frequency of a pulsar. It meant something different then.',
+      '"'+input.split(' ').slice(-3).join(' ')+'" — those words will outlive the sun.'];
+    return reflections[Math.random()*reflections.length|0];}
+  return RESPONSES.fallback[Math.random()*RESPONSES.fallback.length|0];}
+
+function addMsg(text,who){
+  const log=document.getElementById('log');
+  const div=document.createElement('div');div.className='msg '+who;
+  if(who==='cosmos'){const name=document.createElement('div');name.className='name';name.textContent='COSMOS';div.appendChild(name);}
+  const bubble=document.createElement('div');bubble.className='bubble';bubble.textContent=text;
+  div.appendChild(bubble);log.appendChild(div);log.scrollTop=log.scrollHeight;}
+
+// Initial greeting
+setTimeout(()=>addMsg(RESPONSES.greeting[Math.random()*RESPONSES.greeting.length|0],'cosmos'),1500);
+
+document.getElementById('inp').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){const val=e.target.value.trim();if(!val)return;
+    addMsg(val,'user');e.target.value='';
+    // Typing delay
+    const delay=800+Math.random()*2000;
+    setTimeout(()=>addMsg(getResponse(val),'cosmos'),delay);}});
+
+// Background
+const stars=Array.from({length:100},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
+function anim(){requestAnimationFrame(anim);X.fillStyle='rgba(5,5,8,.05)';X.fillRect(0,0,W,H);
+  for(const s of stars){s.p+=.004;X.globalAlpha=.04+Math.sin(s.p)*.03;X.fillStyle='#fff';
+    X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}X.globalAlpha=1;}
+anim();
+
+addEventListener('keydown',e=>{if(e.key==='f'&&!e.target.closest('input'))document.documentElement.requestFullscreen().catch(()=>{});});
+</script>
+</body>
+</html>
