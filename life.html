@@ -101,7 +101,8 @@ function anim(){requestAnimationFrame(anim);_fc++;if(_shuf){_shufT++;if(_shufT>3
     X.globalAlpha=.04+spd*.02;X.fillStyle=s.color;X.beginPath();X.arc(p.x,p.y,4+spd*2,0,Math.PI*2);X.fill();
     X.globalAlpha=.6+spd*.2;X.beginPath();X.arc(p.x,p.y,1.5,0,Math.PI*2);X.fill();}
   X.globalAlpha=1;
-  document.getElementById('info').textContent=COUNT+' PARTICLES · '+N+' SPECIES · '+_fps+' FPS · CLICK MATRIX TO EDIT';}
+  const pop=[0,0,0,0];for(const p of particles)pop[p.sp]++;
+  document.getElementById('info').textContent='R:'+pop[0]+' G:'+pop[1]+' B:'+pop[2]+' Y:'+pop[3]+' · '+_fps+' FPS';}
 anim();
 </script>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
