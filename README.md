@@ -1,6 +1,6 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-5900+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-10_HTML-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square) ![FPS](https://img.shields.io/badge/FPS-60-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-6000+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-11_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-100-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
 **9 cosmic experiences in pure HTML. No dependencies.**
 
