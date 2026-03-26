@@ -59,7 +59,7 @@ let currentPower=0,targetPower=0;
 
 addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowRight'){targetPower=Math.min(26,targetPower+1);}
   if(e.key==='ArrowUp'||e.key==='ArrowLeft'){targetPower=Math.max(-15,targetPower-1);}
-  if(e.key==='Home'){targetPower=0;}if(e.key==='End'){targetPower=26;}});
+  if(e.key==='Home'||e.key==='0'){targetPower=0;}if(e.key==='End'){targetPower=26;}});
 addEventListener('wheel',e=>{e.preventDefault();targetPower+=e.deltaY>0?1:-1;
   targetPower=Math.max(-15,Math.min(26,targetPower));},{passive:false});
 
@@ -111,7 +111,8 @@ function anim(){requestAnimationFrame(anim);
   document.getElementById('size').textContent=obj[2];
   document.getElementById('desc').textContent=obj[3];
   document.getElementById('label').style.opacity=proximity>.3?'1':'0';
-  document.getElementById('power').textContent='10'+formatSup(Math.round(currentPower))+' m';
+  const objIdx=OBJECTS.findIndex(o=>o===obj);
+  document.getElementById('power').textContent='10'+formatSup(Math.round(currentPower))+' m — '+(objIdx+1)+'/'+OBJECTS.length;
   // Scale bar position
   const barPos=((currentPower+15)/41)*100;
   document.getElementById('scalePos').style.top=barPos+'%';}
