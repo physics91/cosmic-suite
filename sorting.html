@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sorting</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='8' y='18' width='3' height='8' fill='%2344aaff' opacity='.4'/><rect x='13' y='12' width='3' height='14' fill='%2344aaff' opacity='.5'/><rect x='18' y='6' width='3' height='20' fill='%2344aaff' opacity='.6'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#040410;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #algo-name{position:fixed;top:36px;left:50%;transform:translateX(-50%);color:rgba(100,170,255,.3);font-size:14px;letter-spacing:4px;font-weight:200;z-index:2;pointer-events:none}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">WATCH ALGORITHMS THINK</div>
+<div id="algo-name">BUBBLE SORT</div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="startSort()">Start</button>
+<button class="btn" style="bottom:16px;right:75px" onclick="nextAlgo()">Next Algo</button>
+<button class="btn" style="bottom:16px;right:165px" onclick="shuffle()">Shuffle</button>
+<button class="btn" style="bottom:16px;right:230px" onclick="cycleSize()">Size: <span id="szV">64</span></button>
+<button class="btn" style="bottom:16px;right:320px" onclick="cycleSpeed()">Speed: <span id="spdV">1x</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="#" onclick="const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','pendulum.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// === STATE ===
+let arr=[],n=64,sorting=false,comparisons=0,swaps=0;
+let activeIndices=new Set(),sortedIndices=new Set();
+let stepQueue=[],stepIdx=0,speed=1;
+let algoIdx=0;
+let aC=null;
+
+const ALGOS=[
+  {name:'BUBBLE SORT',desc:'O(n\u00b2) \u2014 simple, slow, beautiful in its honesty'},
+  {name:'SELECTION SORT',desc:'O(n\u00b2) \u2014 finds the minimum, places it, repeats'},
+  {name:'INSERTION SORT',desc:'O(n\u00b2) \u2014 builds the sorted array one item at a time'},
+  {name:'QUICK SORT',desc:'O(n log n) \u2014 divide and conquer, the elegant warrior'},
+  {name:'MERGE SORT',desc:'O(n log n) \u2014 split, sort, merge \u2014 patience pays off'},
+  {name:'HEAP SORT',desc:'O(n log n) \u2014 builds a heap, extracts the max'},
+  {name:'SHELL SORT',desc:'O(n\u00b3\u2044\u00b2) \u2014 gap-based insertion, bridges distant elements'},
+];
+
+function initAudio(){if(!aC)aC=new(AudioContext||webkitAudioContext)();}
+function playTone(val){
+  if(!aC)initAudio();
+  const t=aC.currentTime;
+  const freq=200+val/n*600;
+  const o=aC.createOscillator(),g=aC.createGain();
+  o.type='sine';o.frequency.value=freq;
+  g.gain.setValueAtTime(.01,t);g.gain.exponentialRampToValueAtTime(.001,t+.05);
+  o.connect(g);g.connect(aC.destination);o.start(t);o.stop(t+.06);
+}
+
+function shuffle(){
+  arr=[];for(let i=0;i<n;i++)arr[i]=i+1;
+  for(let i=n-1;i>0;i--){const j=Math.random()*i|0;[arr[i],arr[j]]=[arr[j],arr[i]];}
+  stepQueue=[];stepIdx=0;sorting=false;comparisons=0;swaps=0;
+  activeIndices.clear();sortedIndices.clear();
+}
+
+function cycleSize(){n=n>=256?32:n*2;document.getElementById('szV').textContent=n;shuffle();}
+function cycleSpeed(){speed=speed>=16?1:speed*2;document.getElementById('spdV').textContent=speed+'x';}
+function nextAlgo(){algoIdx=(algoIdx+1)%ALGOS.length;document.getElementById('algo-name').textContent=ALGOS[algoIdx].name;shuffle();}
+
+// === SORTING ALGORITHMS (generate step queue) ===
+function generateSteps(){
+  stepQueue=[];const a=[...arr];
+  const record=(type,i,j)=>stepQueue.push({type,i,j,arr:[...a]});
+
+  if(algoIdx===0){// Bubble
+    for(let i=0;i<a.length;i++)for(let j=0;j<a.length-i-1;j++){
+      record('compare',j,j+1);
+      if(a[j]>a[j+1]){[a[j],a[j+1]]=[a[j+1],a[j]];record('swap',j,j+1);}
+    }
+  }else if(algoIdx===1){// Selection
+    for(let i=0;i<a.length;i++){let min=i;
+      for(let j=i+1;j<a.length;j++){record('compare',min,j);if(a[j]<a[min])min=j;}
+      if(min!==i){[a[i],a[min]]=[a[min],a[i]];record('swap',i,min);}
+      record('sorted',i,i);
+    }
+  }else if(algoIdx===2){// Insertion
+    for(let i=1;i<a.length;i++){let j=i;
+      while(j>0){record('compare',j-1,j);if(a[j-1]>a[j]){[a[j-1],a[j]]=[a[j],a[j-1]];record('swap',j-1,j);j--;}else break;}
+    }
+  }else if(algoIdx===3){// Quick
+    const qs=(lo,hi)=>{if(lo>=hi)return;const pivot=a[hi];let i=lo;
+      for(let j=lo;j<hi;j++){record('compare',j,hi);if(a[j]<pivot){[a[i],a[j]]=[a[j],a[i]];record('swap',i,j);i++;}}
+      [a[i],a[hi]]=[a[hi],a[i]];record('swap',i,hi);qs(lo,i-1);qs(i+1,hi);};
+    qs(0,a.length-1);
+  }else if(algoIdx===4){// Merge
+    const ms=(lo,hi)=>{if(lo>=hi)return;const mid=(lo+hi)>>1;ms(lo,mid);ms(mid+1,hi);
+      const tmp=[];let i=lo,j=mid+1;
+      while(i<=mid&&j<=hi){record('compare',i,j);if(a[i]<=a[j])tmp.push(a[i++]);else tmp.push(a[j++]);}
+      while(i<=mid)tmp.push(a[i++]);while(j<=hi)tmp.push(a[j++]);
+      for(let k=0;k<tmp.length;k++){a[lo+k]=tmp[k];record('swap',lo+k,lo+k);}};
+    ms(0,a.length-1);
+  }else if(algoIdx===5){// Heap
+    const heapify=(sz,i)=>{let largest=i;const l=2*i+1,r=2*i+2;
+      if(l<sz){record('compare',l,largest);if(a[l]>a[largest])largest=l;}
+      if(r<sz){record('compare',r,largest);if(a[r]>a[largest])largest=r;}
+      if(largest!==i){[a[i],a[largest]]=[a[largest],a[i]];record('swap',i,largest);heapify(sz,largest);}};
+    for(let i=(a.length>>1)-1;i>=0;i--)heapify(a.length,i);
+    for(let i=a.length-1;i>0;i--){[a[0],a[i]]=[a[i],a[0]];record('swap',0,i);heapify(i,0);}
+  }else if(algoIdx===6){// Shell
+    let gap=Math.floor(a.length/2);
+    while(gap>0){
+      for(let i=gap;i<a.length;i++){let j=i;
+        while(j>=gap){record('compare',j-gap,j);if(a[j-gap]>a[j]){[a[j-gap],a[j]]=[a[j],a[j-gap]];record('swap',j-gap,j);j-=gap;}else break;}}
+      gap=Math.floor(gap/2);
+    }
+  }
+  record('done',0,0);
+}
+
+function startSort(){
+  if(sorting)return;
+  shuffle();generateSteps();
+  sorting=true;stepIdx=0;comparisons=0;swaps=0;
+}
+
+shuffle();
+
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();startSort();}
+  if(e.key==='ArrowRight')nextAlgo();
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+});
+
+// === RENDER ===
+function anim(){requestAnimationFrame(anim);
+  X.fillStyle='rgba(4,4,16,.15)';X.fillRect(0,0,W,H);
+
+  // Process steps
+  if(sorting&&stepIdx<stepQueue.length){
+    const stepsPerFrame=Math.min(speed*2,stepQueue.length-stepIdx);
+    for(let s=0;s<stepsPerFrame&&stepIdx<stepQueue.length;s++){
+      const step=stepQueue[stepIdx++];
+      if(step.type==='done'){sorting=false;sortedIndices=new Set(arr.map((_,i)=>i));break;}
+      arr=[...step.arr];
+      activeIndices.clear();activeIndices.add(step.i);activeIndices.add(step.j);
+      if(step.type==='compare')comparisons++;
+      if(step.type==='swap'){swaps++;playTone(arr[step.i]);}
+      if(step.type==='sorted')sortedIndices.add(step.i);
+    }
+  }
+
+  // Draw bars
+  const barW=Math.max(1,W/n-1);
+  const maxH=H*.7;
+  for(let i=0;i<arr.length;i++){
+    const h=(arr[i]/n)*maxH;
+    const x=i*(W/n);
+    const y=H-40-h;
+    const hue=(arr[i]/n)*240;
+
+    if(activeIndices.has(i)){
+      X.globalAlpha=.9;X.fillStyle='#ffffff';
+    }else if(sortedIndices.has(i)||(!sorting&&stepIdx>0)){
+      X.globalAlpha=.6;X.fillStyle='hsl('+hue+',60%,55%)';
+    }else{
+      X.globalAlpha=.4;X.fillStyle='hsl('+hue+',50%,45%)';
+    }
+    X.fillRect(x,y,barW,h);
+
+    // Active glow
+    if(activeIndices.has(i)){
+      X.globalAlpha=.1;X.fillStyle='#fff';
+      X.fillRect(x-1,y-5,barW+2,h+10);
+    }
+  }
+
+  X.globalAlpha=1;
+  document.getElementById('stats').textContent=
+    ALGOS[algoIdx].desc+'\ncomparisons: '+comparisons+'\nswaps: '+swaps+
+    '\nn: '+n+(sorting?' \u25b6':stepIdx>0?' \u2713':' \u23f8');
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="sorting.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
