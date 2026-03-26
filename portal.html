@@ -30,7 +30,8 @@
 </head>
 <body>
 <div id="title">THE COSMIC SUITE</div>
-<div id="sub">9 EXPERIENCES · 0 DEPENDENCIES</div>
+<div id="sub"></div>
+<script>const _h=new Date().getHours();document.getElementById('sub').textContent=_h<6?'the stars await':_h<12?'good morning, creator':_h<18?'the cosmos turns':'welcome to the night sky';</script>
 <div id="label"><h2 id="lName"></h2><div class="desc" id="lDesc"></div><div class="tag" id="lTag"></div></div>
 <div id="hint">HOVER TO EXPLORE · CLICK TO ENTER</div>
 <div style="position:fixed;bottom:50px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:3">
