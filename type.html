@@ -87,7 +87,22 @@ input.addEventListener('input',()=>{
     else{spawnStar(char);}}
   lastLength=val.length;});
 
+// Explosion particles
+const explosions=[];
 input.addEventListener('keydown',e=>{
+  if(e.key==='Backspace'&&stars.length>0){
+    // Find most recent non-word star and explode it
+    for(let i=stars.length-1;i>=0;i--){
+      if(!stars[i].wordStar){
+        const s=stars[i];
+        for(let p=0;p<8;p++){
+          explosions.push({x:s.x,y:s.y,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4-2,
+            life:30+Math.random()*20,hue:s.hue,sz:1+Math.random()*2});
+        }
+        stars.splice(i,1);break;
+      }
+    }
+  }
   if(e.key==='Tab'){e.preventDefault();hueBase=(hueBase+60)%360;}
   if(e.key==='Escape'){input.value='';lastLength=0;}
   if(e.key==='Enter'){// Submit line — burst all remaining characters
@@ -108,9 +123,15 @@ function anim(){requestAnimationFrame(anim);
   // BG
   for(const s of bg){s.p+=.005;X.globalAlpha=.04+Math.sin(s.p)*.03;X.fillStyle='#fff';
     X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
-  // Stars
+  // Stars with gravity
   for(let i=stars.length-1;i>=0;i--){const s=stars[i];
-    s.life--;s.glow*=.97;s.x+=s.vx;s.y+=s.vy;s.phase+=.02;
+    s.life--;s.glow*=.97;
+    // Gravity — gentle pull downward unless anchored as word star
+    if(!s.wordStar){s.vy+=.003;s.vx*=.999;s.vy*=.999;} // float & drift
+    else{s.vy+=.0005;s.vx*=.998;s.vy*=.998;} // word stars drift slower
+    s.x+=s.vx;s.y+=s.vy;s.phase+=.02;
+    // Bounce off bottom
+    if(s.y>H-30){s.y=H-30;s.vy*=-.5;s.vx+=(Math.random()-.5)*.3;}
     if(s.life<=0){stars.splice(i,1);continue;}
     const alpha=Math.min(1,s.life/100)*Math.min(1,(800-s.life+s.life)/100);
     // Glow
@@ -130,6 +151,13 @@ function anim(){requestAnimationFrame(anim);
     const a=wordStars[i-1],b=wordStars[i];
     const dx=a.x-b.x,dy=a.y-b.y;if(dx*dx+dy*dy>10000)continue;
     X.globalAlpha=.03;X.beginPath();X.moveTo(a.x,a.y);X.lineTo(b.x,b.y);X.stroke();}
+  // Explosion particles
+  for(let i=explosions.length-1;i>=0;i--){
+    const p=explosions[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.life--;
+    if(p.life<=0){explosions.splice(i,1);continue;}
+    X.globalAlpha=(p.life/50)*.4;X.fillStyle='hsl('+p.hue+',80%,70%)';
+    X.beginPath();X.arc(p.x,p.y,p.sz*(p.life/50),0,Math.PI*2);X.fill();
+  }
   X.globalAlpha=1;
   const wpm=startTime&&totalWords?Math.round(totalWords/((performance.now()-startTime)/60000)):0;
   document.getElementById('stats').textContent=totalKeys+' keys · '+totalWords+' words · '+stars.length+' stars · '+uniqueChars.size+' unique'+(wpm?' · '+wpm+' wpm':'');}
