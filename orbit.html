@@ -172,7 +172,8 @@ function render(){requestAnimationFrame(render);
   for(const p of particles){X.globalAlpha=(p.life/20)*.5;X.fillStyle=p.color;
     X.beginPath();X.arc(p.x,p.y,1.5,0,Math.PI*2);X.fill();}
   X.globalAlpha=1;X.restore();
-  document.getElementById('score').textContent=score+(state==='play'?' · '+Math.floor(survivalTime)+'s':'');
+  const newBest=state==='play'&&score>bestScore&&bestScore>0;
+  document.getElementById('score').textContent=score+(state==='play'?' · '+Math.floor(survivalTime)+'s':'')+(newBest?' NEW BEST!':'');
   const alt=state==='play'?Math.round(Math.sqrt((ship.x-stars[0].x)**2+(ship.y-stars[0].y)**2)):0;
   document.getElementById('hint').textContent=state==='play'?'LEVEL '+level+(boosting?' · BOOST':'')+(alt?' · ALT '+alt:'')+(combo>1?' · x'+combo+' COMBO':''):'';}
 render();
