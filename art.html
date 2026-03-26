@@ -43,6 +43,7 @@
   <button class="btn" onclick="randomWells()">Random</button>
   <button class="btn" onclick="ringWells()">Ring</button>
   <button class="btn" onclick="spiralWells()">Spiral</button>
+  <button class="btn" onclick="gridWells()">Grid</button>
   <button class="btn" onclick="symm=!symm;this.textContent=symm?'Symm ON':'Symm OFF'">Symm OFF</button>
   <button class="btn" onclick="exportArt()">Export PNG</button>
 </div>
@@ -104,6 +105,8 @@ function resetParticles(){initParticles(+(document.getElementById('pCount').valu
 function clearWells(){wells=[];}
 function randomWells(){clearWells();const n=3+Math.random()*5|0;
   for(let i=0;i<n;i++)wells.push({x:Math.random()*W,y:Math.random()*H,mass:50+Math.random()*200});}
+function gridWells(){clearWells();const m=+(document.getElementById('gStr').value);
+  for(let x=0;x<4;x++)for(let y=0;y<3;y++)wells.push({x:W*.2+x*W*.2,y:H*.2+y*H*.3,mass:m});}
 function spiralWells(){clearWells();const m=+(document.getElementById('gStr').value);
   for(let i=0;i<12;i++){const a=i*.7;const r=40+i*18;wells.push({x:W/2+Math.cos(a)*r,y:H/2+Math.sin(a)*r,mass:m});}}
 function ringWells(){clearWells();const n=8;const m=+(document.getElementById('gStr').value);
