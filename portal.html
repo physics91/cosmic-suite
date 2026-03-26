@@ -7,101 +7,91 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000' stroke='%23fff' stroke-width='.5' opacity='.5'/><circle cx='16' cy='16' r='3' fill='%23fff'/></svg>">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#050508;color:#fff;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px}
-    canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
-    .content{position:relative;z-index:1;max-width:800px;width:100%;text-align:center}
-    h1{font-weight:100;font-size:min(8vw,48px);letter-spacing:min(3vw,16px);margin-bottom:8px;opacity:.9}
-    .sub{color:rgba(255,255,255,.25);font-size:12px;letter-spacing:4px;margin-bottom:50px}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:40px}
-    .card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:30px 24px;text-align:center;cursor:pointer;transition:all .3s;text-decoration:none;color:#fff;display:block}
-    .card:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.15);transform:translateY(-4px)}
-    .card .icon{font-size:32px;margin-bottom:12px;opacity:.6}
-    .card h2{font-weight:200;font-size:20px;letter-spacing:4px;margin-bottom:8px}
-    .card .desc{color:rgba(255,255,255,.35);font-size:11px;line-height:1.8;letter-spacing:.5px}
-    .card .tag{display:inline-block;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:2px 8px;font-size:9px;color:rgba(255,255,255,.3);margin-top:12px}
-    .footer{color:rgba(255,255,255,.1);font-size:10px;letter-spacing:2px;margin-top:20px}
-    .footer a{color:rgba(255,255,255,.2);text-decoration:none}
-    .quote{color:rgba(255,255,255,.15);font-size:11px;font-style:italic;margin-bottom:30px;max-width:500px;line-height:1.8}
-    @media(max-width:600px){.grid{grid-template-columns:1fr}h1{letter-spacing:8px}.card{padding:20px 16px}}
+    body{background:#050508;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:default}
+    canvas{display:block}
+    #label{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);text-align:center;z-index:2;pointer-events:none;transition:opacity .4s;opacity:0}
+    #label.show{opacity:1}
+    #label h2{color:rgba(255,255,255,.7);font-weight:200;font-size:22px;letter-spacing:5px}
+    #label .desc{color:rgba(255,255,255,.3);font-size:11px;margin-top:6px;max-width:400px;line-height:1.7}
+    #label .tag{color:rgba(255,255,255,.2);font-size:9px;margin-top:8px;letter-spacing:3px;text-transform:uppercase}
+    #title{position:fixed;top:30px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:16px;font-weight:200;letter-spacing:8px;z-index:2;pointer-events:none}
+    #hint{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.1);font-size:9px;letter-spacing:2px;z-index:2;pointer-events:none}
+    #sub{position:fixed;top:52px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.08);font-size:10px;letter-spacing:3px;z-index:2;pointer-events:none}
   </style>
 </head>
 <body>
-<canvas id="bg"></canvas>
-<div class="content">
-  <h1>THE COSMIC SUITE</h1>
-  <div class="sub">FOUR EXPERIENCES · ZERO DEPENDENCIES</div>
-  <div class="quote">"From nothing, everything."</div>
-  <div class="grid">
-    <a class="card" href="index.html">
-      <div class="icon">🌌</div>
-      <h2>COSMOS</h2>
-      <div class="desc">A complete universe simulator. Physics, astronomy, biology, civilization, consciousness — all in one file. 84 achievements. 4672 lines.</div>
-      <div class="tag">explore</div>
-    </a>
-    <a class="card" href="music.html">
-      <div class="icon">🎵</div>
-      <h2>MUSIC BOX</h2>
-      <div class="desc">Place stars on a grid. They become notes. A visual sequencer where gravity composes melodies. 5 scales. Bell synthesis.</div>
-      <div class="tag">listen</div>
-    </a>
-    <a class="card" href="art.html">
-      <div class="icon">🎨</div>
-      <h2>GRAVITY CANVAS</h2>
-      <div class="desc">Draw with gravity. Place wells, watch particles flow. Every creation is unique. 5 palettes. Export as PNG.</div>
-      <div class="tag">create</div>
-    </a>
-    <a class="card" href="breathe.html">
-      <div class="icon">🧘</div>
-      <h2>BREATHE</h2>
-      <div class="desc">Cosmic meditation. Sync your breath with the mandala. 4 patterns. Binaural beats. Pure contemplation.</div>
-      <div class="tag">feel</div>
-    </a>
-    <a class="card" href="life.html">
-      <div class="icon">🧬</div>
-      <h2>PARTICLE LIFE</h2>
-      <div class="desc">Color-coded particles attract and repel. Cells form. Organisms emerge. Life from simple rules. Click the matrix to reshape reality.</div>
-      <div class="tag">think</div>
-    </a>
-    <a class="card" href="clock.html">
-      <div class="icon">🕐</div>
-      <h2>COSMIC CLOCK</h2>
-      <div class="desc">Time rendered as orbiting light. Hour comet, minute nebula, second star. A clock for stargazers.</div>
-      <div class="tag">watch</div>
-    </a>
-    <a class="card" href="orbit.html">
-      <div class="icon">🚀</div>
-      <h2>ORBIT RUNNER</h2>
-      <div class="desc">One button. Stay in orbit. Don't crash into stars, don't drift into the void. How long can you survive?</div>
-      <div class="tag">play</div>
-    </a>
-    <a class="card" href="scale.html">
-      <div class="icon">🔬</div>
-      <h2>COSMIC SCALE</h2>
-      <div class="desc">Scroll from quarks to the observable universe. 40 orders of magnitude. Everything is relative.</div>
-      <div class="tag">learn</div>
-    </a>
-    <a class="card" href="type.html">
-      <div class="icon">✍</div>
-      <h2>COSMIC TYPE</h2>
-      <div class="desc">Every keystroke creates a star. Words become constellations. Your thoughts become light.</div>
-      <div class="tag">write</div>
-    </a>
-  </div>
-  <div class="footer">
-    single HTML files · no frameworks · no build tools · no dependencies<br>
-    <br>built with imagination and javascript
-  </div>
-</div>
+<div id="title">THE COSMIC SUITE</div>
+<div id="sub">9 EXPERIENCES · 0 DEPENDENCIES</div>
+<div id="label"><h2 id="lName"></h2><div class="desc" id="lDesc"></div><div class="tag" id="lTag"></div></div>
+<div id="hint">HOVER TO EXPLORE · CLICK TO ENTER</div>
+<canvas id="c"></canvas>
 <script>
-const C=document.getElementById('bg'),X=C.getContext('2d');
+const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
-const stars=Array.from({length:150},()=>({x:Math.random()*2e3,y:Math.random()*2e3,s:Math.random()*1.5,p:Math.random()*Math.PI*2,sp:.5+Math.random()*2}));
-function anim(){requestAnimationFrame(anim);
-  X.fillStyle='rgba(5,5,8,.08)';X.fillRect(0,0,W,H);
-  for(const s of stars){s.p+=.005*s.sp;
-    X.globalAlpha=.08+Math.sin(s.p)*.06;X.fillStyle='#fff';
+
+const EXP=[
+  {name:'COSMOS',desc:'A complete universe simulator. Physics, astronomy, biology, civilization, consciousness.',tag:'explore',href:'index.html',color:'#6688ff',icon:'🌌',orbit:1},
+  {name:'MUSIC BOX',desc:'Place stars on a grid. They become notes. A visual sequencer.',tag:'listen',href:'music.html',color:'#ffcc44',icon:'🎵',orbit:2},
+  {name:'GRAVITY CANVAS',desc:'Draw with gravity. Place wells, watch particles flow.',tag:'create',href:'art.html',color:'#ff6644',icon:'🎨',orbit:3},
+  {name:'BREATHE',desc:'Cosmic meditation. Sync your breath with the mandala.',tag:'feel',href:'breathe.html',color:'#44ddaa',icon:'🧘',orbit:4},
+  {name:'PARTICLE LIFE',desc:'Color-coded particles attract and repel. Life emerges from rules.',tag:'think',href:'life.html',color:'#ff4488',icon:'🧬',orbit:5},
+  {name:'COSMIC CLOCK',desc:'Time rendered as orbiting light. A clock for stargazers.',tag:'watch',href:'clock.html',color:'#aabbcc',icon:'🕐',orbit:6},
+  {name:'ORBIT RUNNER',desc:'One button. Stay in orbit. Don\'t crash. Don\'t drift.',tag:'play',href:'orbit.html',color:'#44aaff',icon:'🚀',orbit:7},
+  {name:'COSMIC SCALE',desc:'Scroll from quarks to the observable universe. 40 orders of magnitude.',tag:'learn',href:'scale.html',color:'#aa77ff',icon:'🔬',orbit:8},
+  {name:'COSMIC TYPE',desc:'Every keystroke creates a star. Words become constellations.',tag:'write',href:'type.html',color:'#ff88aa',icon:'✍',orbit:9},
+];
+
+let hovered=-1,t=0;
+const bgStars=Array.from({length:200},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random()*1.5,p:Math.random()*Math.PI*2}));
+
+C.addEventListener('mousemove',e=>{
+  const cx=W/2,cy=H/2;let best=-1,bd=2500;
+  for(let i=0;i<EXP.length;i++){const exp=EXP[i];
+    const r=60+exp.orbit*30;const a=t*.2/exp.orbit+i*Math.PI*2/EXP.length;
+    const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
+    const dx=e.clientX-px,dy=e.clientY-py;if(dx*dx+dy*dy<bd){bd=dx*dx+dy*dy;best=i;}}
+  if(best!==hovered){hovered=best;
+    if(best>=0){document.getElementById('lName').textContent=EXP[best].name;
+      document.getElementById('lDesc').textContent=EXP[best].desc;
+      document.getElementById('lTag').textContent=EXP[best].tag;
+      document.getElementById('label').classList.add('show');document.body.style.cursor='pointer';}
+    else{document.getElementById('label').classList.remove('show');document.body.style.cursor='default';}}});
+
+C.addEventListener('click',()=>{if(hovered>=0)location.href=EXP[hovered].href;});
+
+function anim(){requestAnimationFrame(anim);t+=.01;
+  X.fillStyle='rgba(5,5,8,.12)';X.fillRect(0,0,W,H);
+  const cx=W/2,cy=H/2;
+  // BG stars
+  for(const s of bgStars){s.p+=.003;X.globalAlpha=.05+Math.sin(s.p)*.03;X.fillStyle='#fff';
     X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
+  // Center sun
+  X.globalAlpha=.06;const sg=X.createRadialGradient(cx,cy,0,cx,cy,50);
+  sg.addColorStop(0,'rgba(255,255,255,.3)');sg.addColorStop(1,'rgba(0,0,0,0)');
+  X.fillStyle=sg;X.beginPath();X.arc(cx,cy,50,0,Math.PI*2);X.fill();
+  X.globalAlpha=.5;X.fillStyle='#fff';X.beginPath();X.arc(cx,cy,4,0,Math.PI*2);X.fill();
+  // Orbit rings
+  for(const exp of EXP){const r=60+exp.orbit*30;
+    X.globalAlpha=.015;X.strokeStyle='#fff';X.lineWidth=.5;
+    X.beginPath();X.arc(cx,cy,r,0,Math.PI*2);X.stroke();}
+  // Experience planets
+  for(let i=0;i<EXP.length;i++){const exp=EXP[i];
+    const r=60+exp.orbit*30;const a=t*.2/exp.orbit+i*Math.PI*2/EXP.length;
+    const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
+    const isHov=i===hovered;const sz=isHov?12:7;
+    // Glow
+    X.globalAlpha=isHov?.15:.04;X.fillStyle=exp.color;
+    X.beginPath();X.arc(px,py,sz*3,0,Math.PI*2);X.fill();
+    // Body
+    X.globalAlpha=isHov?.9:.5;X.fillStyle=exp.color;
+    X.beginPath();X.arc(px,py,sz,0,Math.PI*2);X.fill();
+    // Icon
+    X.globalAlpha=isHov?.8:.3;X.font=(isHov?16:11)+'px sans-serif';X.textAlign='center';X.textBaseline='middle';
+    X.fillText(exp.icon,px,py);
+    // Label on hover
+    if(isHov){X.globalAlpha=.4;X.font='9px sans-serif';X.fillStyle='#fff';
+      X.fillText(exp.name,px,py+sz+14);}}
   X.globalAlpha=1;}
 anim();
 </script>
