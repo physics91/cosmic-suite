@@ -75,6 +75,9 @@ renderMatrix();
 
 let _paused=false;
 addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();_paused=!_paused;}});
+C.addEventListener('contextmenu',e=>{e.preventDefault();
+  for(let i=particles.length-1;i>=0;i--){const dx=particles[i].x-e.clientX,dy=particles[i].y-e.clientY;
+    if(dx*dx+dy*dy<400){particles.splice(i,1);break;}}});
 C.addEventListener('click',e=>{if(e.target===C)for(let i=0;i<20;i++){
   particles.push({x:e.clientX+(Math.random()-.5)*30,y:e.clientY+(Math.random()-.5)*30,vx:(Math.random()-.5)*3,vy:(Math.random()-.5)*3,sp:Math.random()*N|0});}});
 const RADIUS=80,FRICTION=.5,FORCE=.5;
