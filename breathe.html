@@ -119,8 +119,10 @@ function anim(){requestAnimationFrame(anim);
   else scale=breathPhase===1?1.2:.6;// hold at current
   if(!active)scale=.8+Math.sin(Date.now()*.001)*.1;
 
+  // Phase-based background tint
+  const phaseTint=[[0,2,8],[3,3,5],[0,5,3],[2,2,4]][breathPhase]||[0,0,0];
   // Background
-  const[br,bg,bb]=th2.bg;
+  const[br,bg,bb]=[th2.bg[0]+phaseTint[0],th2.bg[1]+phaseTint[1],th2.bg[2]+phaseTint[2]];
   X.fillStyle=`rgba(${br},${bg},${bb},.12)`;X.fillRect(0,0,W,H);
 
   const cx=W/2,cy=H/2;
