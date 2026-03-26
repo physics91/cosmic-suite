@@ -124,18 +124,63 @@ function anim(){requestAnimationFrame(anim);
     // Collision
     if(state==='play'&&dz<15&&Math.abs(o.lane-posX)<.4){gameOver();}}
 
+  // === RELATIVISTIC EFFECTS ===
+  const maxSpeed=12;
+  const v=speed/maxSpeed; // 0-1 fraction of "light speed"
+  const gamma=1/Math.sqrt(1-v*v*.9); // Lorentz factor (capped)
+  const tunnelStrength=v*v; // tunnel vision intensity
+
+  // Lorentz contraction — tunnel vision vignette
+  if(state==='play'&&v>.3){
+    const vg=X.createRadialGradient(cx,H/2,W*.2*(1-tunnelStrength*.5),cx,H/2,W*.7);
+    vg.addColorStop(0,'rgba(0,0,0,0)');
+    vg.addColorStop(1,'rgba(0,0,0,'+(tunnelStrength*.7)+')');
+    X.fillStyle=vg;X.fillRect(0,0,W,H);
+  }
+
+  // Blue/redshift on stars
+  if(state==='play'&&v>.2){
+    // Forward stars blueshift, edge stars redshift
+    for(const s of stars){
+      const fromCenter=Math.abs(s.x-cx)/(W/2);
+      if(fromCenter<.3){
+        X.globalAlpha=v*.15;X.fillStyle='#aaddff';
+      }else{
+        X.globalAlpha=v*.08;X.fillStyle='#ffaa88';
+      }
+      X.beginPath();X.arc(s.x,s.y,s.s*(1+v),0,Math.PI*2);X.fill();
+    }
+    // Speed lines at high velocity
+    if(v>.5){
+      X.globalAlpha=v*.06;X.strokeStyle='#aaccff';X.lineWidth=.5;
+      for(let i=0;i<10;i++){
+        const lx=cx+(Math.random()-.5)*W*.8;
+        const ly=H*.2+Math.random()*H*.3;
+        const len=20+v*40;
+        X.beginPath();X.moveTo(lx,ly);X.lineTo(lx+(lx-cx)*.1,ly+len);X.stroke();
+      }
+    }
+  }
+
   // Ship
   if(state==='play'||state==='menu'){
     const shipY=H*.75;const shipX=cx-posX*80;
     X.globalAlpha=.15;X.fillStyle='#44aaff';X.beginPath();X.arc(shipX,shipY,20,0,Math.PI*2);X.fill();
     X.globalAlpha=.7;X.fillStyle='#44aaff';
     X.beginPath();X.moveTo(shipX,shipY-15);X.lineTo(shipX-10,shipY+8);X.lineTo(shipX,shipY+3);X.lineTo(shipX+10,shipY+8);X.closePath();X.fill();
-    // Engine glow
-    X.globalAlpha=.3;X.fillStyle='#ffaa44';X.beginPath();X.arc(shipX,shipY+10,3+Math.random()*2,0,Math.PI*2);X.fill();}
+    // Engine glow — intensifies with speed
+    const engSize=3+Math.random()*2+v*5;
+    X.globalAlpha=.3+v*.3;X.fillStyle=v>.7?'#aaddff':'#ffaa44';
+    X.beginPath();X.arc(shipX,shipY+10,engSize,0,Math.PI*2);X.fill();
+    if(v>.6){X.globalAlpha=.1;X.beginPath();X.arc(shipX,shipY+10,engSize*3,0,Math.PI*2);X.fill();}
+  }
 
   X.globalAlpha=1;
+  // HUD with relativistic info
   document.getElementById('hud').textContent=score;
-  document.getElementById('sub').textContent='SPD '+Math.floor(speed*10)+' · BEST '+best;}
+  const c_frac=(v*100).toFixed(0);
+  const gamma_disp=gamma.toFixed(2);
+  document.getElementById('sub').textContent=c_frac+'% c · \u03b3='+gamma_disp+' · BEST '+best;}
 
 anim();
 addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
