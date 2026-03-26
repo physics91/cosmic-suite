@@ -106,6 +106,30 @@ function anim(){requestAnimationFrame(anim);
   X.beginPath();X.arc(cx,cy,R,0,Math.PI*2);X.stroke();
   X.beginPath();X.arc(cx,cy,R-15,0,Math.PI*2);X.stroke();
 
+  // === EARTH'S PULSE — global wake/sleep ring ===
+  // 24 timezone sectors, colored by how awake that part of the world is
+  // Population weights (rough): UTC-5(Americas), UTC+1(Europe/Africa), UTC+8(Asia), UTC+9(Japan/Korea)
+  const tzPops=[.5,.5,.5,.5,.5,3,3,3,2,2,1,1,.5,.5,2,2,3,4,4,3,2,1,1,.5]; // relative population per UTC offset
+  const outerR=R+28;
+  for(let tz=0;tz<24;tz++){
+    const localHour=(h+tz)%24;
+    // Awake probability by hour
+    let awake;
+    if(localHour>=7&&localHour<=22)awake=.7+Math.sin((localHour-7)/15*Math.PI)*.3;
+    else if(localHour>=23||localHour<=1)awake=.1;
+    else awake=.2+(localHour-2)/5*.3;
+    const pop=tzPops[tz];
+    const intensity=awake*pop*.015;
+    const a1=tz/24*Math.PI*2-Math.PI/2;
+    const a2=(tz+1)/24*Math.PI*2-Math.PI/2;
+    X.globalAlpha=intensity;
+    X.fillStyle=awake>.5?'rgba(255,200,100,1)':'rgba(100,120,200,1)';
+    X.beginPath();X.moveTo(cx,cy);X.arc(cx,cy,outerR,a1,a2);X.closePath();X.fill();
+  }
+  // Pulse ring label
+  X.globalAlpha=.04;X.font='6px sans-serif';X.textAlign='center';X.fillStyle='#fff';
+  X.fillText('EARTH PULSE',cx,cy-outerR-6);
+
   X.globalAlpha=1;
 
   // Digital time
