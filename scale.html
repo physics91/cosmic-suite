@@ -126,7 +126,11 @@ function anim(){requestAnimationFrame(anim);
   document.getElementById('power').textContent='10'+formatSup(Math.round(currentPower))+' m — '+(objIdx+1)+'/'+OBJECTS.length;
   // Scale bar position
   const barPos=((currentPower+15)/41)*100;
-  document.getElementById('scalePos').style.top=barPos+'%';}
+  document.getElementById('scalePos').style.top=barPos+'%';
+  // "YOU" marker at human scale
+  const youPos=((0+15)/41)*100;
+  X.globalAlpha=.06;X.fillStyle='#ffcc44';X.font='6px sans-serif';X.textAlign='right';
+  X.fillText('YOU →',W-28,H*.2+youPos*(H*.6)/100+3);}
 
 function formatSup(n){const sups='⁰¹²³⁴⁵⁶⁷⁸⁹';const neg=n<0;const abs=Math.abs(n);
   let s=neg?'⁻':'';for(const c of ''+abs)s+=sups[+c];return s;}
