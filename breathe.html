@@ -38,7 +38,7 @@ let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
 // State
-let active=false,breathPhase=0,breathTimer=0,totalTime=0,soundOn=false;
+let active=false,breathPhase=0,breathTimer=0,totalTime=0,soundOn=false,cycles=0;
 let aC=null,oscL=null,oscR=null,gainNode=null;
 
 // Breathing patterns: [inhale, hold, exhale, hold] in seconds
@@ -102,13 +102,13 @@ function anim(){requestAnimationFrame(anim);
 
   if(active){
     breathTimer+=1/60;totalTime+=1/60;
-    if(breathTimer>=phaseDur){breathTimer=0;breathPhase=(breathPhase+1)%4;
+    if(breathTimer>=phaseDur){breathTimer=0;const prev=breathPhase;breathPhase=(breathPhase+1)%4;if(prev===2)cycles++;
       // Skip zero-duration phases
       while(pat.times[breathPhase]===0)breathPhase=(breathPhase+1)%4;
       document.getElementById('phase').textContent=PHASES[breathPhase];
       updateSound();}
     const min=totalTime/60|0;const sec=totalTime%60|0;
-    document.getElementById('timer').textContent=min+'m '+sec+'s';}
+    document.getElementById('timer').textContent=min+'m '+sec+'s · '+cycles+' breaths';}
 
   // Breath progress 0→1
   const progress=breathTimer/phaseDur;
