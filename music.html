@@ -26,6 +26,7 @@
 <div id="info">CLICK TO PLACE STARS · THEY BECOME NOTES</div>
 <div id="playhead"></div>
 <div style="position:fixed;top:16px;left:120px;color:rgba(255,255,255,.3);font-size:10px;z-index:10;display:flex;align-items:center;gap:4px">oct <button onclick="octave=Math.max(-2,octave-1);this.nextElementSibling.textContent=octave" style="background:none;border:1px solid rgba(255,255,255,.1);color:#fff;width:18px;border-radius:4px;cursor:pointer">-</button><span id="octV">0</span><button onclick="octave=Math.min(2,octave+1);this.previousElementSibling.textContent=octave" style="background:none;border:1px solid rgba(255,255,255,.1);color:#fff;width:18px;border-radius:4px;cursor:pointer">+</button></div>
+<div style="position:fixed;top:36px;right:16px;color:rgba(255,255,255,.3);font-size:10px;z-index:10;display:flex;align-items:center;gap:6px">vol <input type="range" id="vol" min="0" max="100" value="40" style="width:60px;accent-color:#ffcc44" oninput="if(mG)mG.gain.value=this.value/250"></div>
 <div id="bpm">BPM <input type="range" id="bpmSlider" min="40" max="200" value="80"><span id="bpmVal">80</span></div>
 <div id="scale">
   <select id="scaleSelect" style="background:rgba(0,0,0,.5);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:2px 6px;font-size:10px">
