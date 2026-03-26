@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Langton's Ant</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='15' y='15' width='2' height='2' fill='%23ff4444' opacity='.6'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    #phase-label{position:fixed;top:36px;left:50%;transform:translateX(-50%);color:rgba(255,200,100,.2);font-size:11px;letter-spacing:3px;z-index:2;pointer-events:none}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">LANGTON'S ANT &middot; 2 RULES CREATE A HIGHWAY</div>
+<div id="phase-label">CHAOS</div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="reset()">Reset</button>
+<button class="btn" style="bottom:16px;right:70px" onclick="cycleSpeed()">Speed: <span id="spdV">100</span>/f</button>
+<button class="btn" style="bottom:16px;right:195px" onclick="addAnt()">+Ant</button>
+<button class="btn" style="bottom:16px;right:250px" onclick="cycleRule()">Rule: <span id="ruleV">RL</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="portal.html" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>document.getElementById('random-jump').onclick=function(){const e=['art.html','about.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chaos-map.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-life.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','maze.html','memory.html','music.html','neural.html','oracle.html','orbit.html','orbits.html','order.html','pendulum.html','pi.html','puzzle.html','quine.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','spirograph.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false;};</script>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+const CELL=2;
+let cols,rows,grid;
+
+function resize(){
+  W=C.width=innerWidth;H=C.height=innerHeight;
+  cols=Math.ceil(W/CELL);rows=Math.ceil(H/CELL);
+  reset();
+}
+
+// Rules: R=turn right, L=turn left. Classic = "RL"
+const RULES_LIST=['RL','RLR','RLLR','RLRR','LLRR','RRLLLRLLLRRR'];
+let ruleIdx=0,rule='RL';
+let ants=[],steps=0,speed=100;
+
+const DIRS=[[0,-1],[1,0],[0,1],[-1,0]]; // N E S W
+const STATE_COLORS=[
+  [0,0,0],[255,255,255],[255,100,80],[80,150,255],
+  [100,255,100],[255,200,80],[200,100,255],[100,200,200],
+  [255,150,150],[150,255,200],[200,200,100],[150,150,255],
+];
+
+class Ant{
+  constructor(x,y,dir){this.x=x;this.y=y;this.dir=dir;this.hue=Math.random()*360;}
+}
+
+function reset(){
+  grid=new Uint8Array(cols*rows);
+  ants=[new Ant(cols>>1,rows>>1,0)];
+  steps=0;
+  X.fillStyle='#000';X.fillRect(0,0,W,H);
+}
+
+function addAnt(){
+  ants.push(new Ant(cols>>1+(Math.random()-.5)*20|0,rows>>1+(Math.random()-.5)*20|0,Math.random()*4|0));
+}
+
+function cycleSpeed(){speed=speed>=500?10:speed>=100?speed+100:speed*2;document.getElementById('spdV').textContent=speed;}
+function cycleRule(){ruleIdx=(ruleIdx+1)%RULES_LIST.length;rule=RULES_LIST[ruleIdx];document.getElementById('ruleV').textContent=rule;reset();}
+
+resize();addEventListener('resize',resize);
+
+addEventListener('keydown',e=>{
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key===' '){e.preventDefault();reset();}
+  if(e.key==='+')addAnt();
+  if(e.key==='r')cycleRule();
+});
+
+// === RENDER ===
+const offC=document.createElement('canvas');
+const offX=offC.getContext('2d');
+let imgData=null;
+
+function step(){
+  for(const ant of ants){
+    if(ant.x<0||ant.x>=cols||ant.y<0||ant.y>=rows)continue;
+    const i=ant.y*cols+ant.x;
+    const state=grid[i]%rule.length;
+    const turn=rule[state];
+    // Turn
+    if(turn==='R')ant.dir=(ant.dir+1)%4;
+    else ant.dir=(ant.dir+3)%4;
+    // Flip state
+    grid[i]=(grid[i]+1)%rule.length;
+    // Move
+    ant.x+=DIRS[ant.dir][0];ant.y+=DIRS[ant.dir][1];
+    // Wrap
+    if(ant.x<0)ant.x=cols-1;if(ant.x>=cols)ant.x=0;
+    if(ant.y<0)ant.y=rows-1;if(ant.y>=rows)ant.y=0;
+  }
+  steps++;
+}
+
+function render(){
+  offC.width=cols;offC.height=rows;
+  if(!imgData||imgData.width!==cols)imgData=new ImageData(cols,rows);
+  const d=imgData.data;
+
+  for(let i=0;i<cols*rows;i++){
+    const pi=i*4;
+    const s=grid[i];
+    const c=STATE_COLORS[s%STATE_COLORS.length];
+    d[pi]=c[0];d[pi+1]=c[1];d[pi+2]=c[2];d[pi+3]=255;
+  }
+  // Draw ants as red dots
+  for(const ant of ants){
+    if(ant.x>=0&&ant.x<cols&&ant.y>=0&&ant.y<rows){
+      const pi=(ant.y*cols+ant.x)*4;
+      d[pi]=255;d[pi+1]=50;d[pi+2]=50;
+    }
+  }
+
+  offX.putImageData(imgData,0,0);
+  X.imageSmoothingEnabled=false;
+  X.drawImage(offC,0,0,cols,rows,0,0,W,H);
+}
+
+function anim(){
+  requestAnimationFrame(anim);
+  for(let i=0;i<speed;i++)step();
+  render();
+
+  // Phase detection
+  const phase=steps<1000?'CHAOS':steps<10000?'SEARCHING':'HIGHWAY';
+  document.getElementById('phase-label').textContent=phase;
+  document.getElementById('phase-label').style.color=
+    phase==='CHAOS'?'rgba(255,100,80,.2)':phase==='SEARCHING'?'rgba(255,200,100,.2)':'rgba(100,255,150,.25)';
+
+  document.getElementById('stats').textContent=
+    'steps: '+steps+'\nants: '+ants.length+'\nrule: '+rule+'\nphase: '+phase.toLowerCase();
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="ant.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
