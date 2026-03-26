@@ -141,14 +141,28 @@ function anim(){requestAnimationFrame(anim);
     X.globalAlpha=.12;X.fillStyle=phase===0?'#88aaff':'#ffaa88';
     X.beginPath();X.arc(px,py,p.sz*breathScale,0,Math.PI*2);X.fill();}
 
-  // Note rings
-  for(let i=rings.length-1;i>=0;i--){const rn=rings[i];rn.r+=2;rn.life-=.015;
+  // Note rings — expand to fill screen
+  for(let i=rings.length-1;i>=0;i--){const rn=rings[i];rn.r+=3;rn.life-=.012;
     if(rn.life<=0){rings.splice(i,1);continue;}
-    X.globalAlpha=rn.life*.1;X.strokeStyle=`hsl(${rn.hue},60%,60%)`;X.lineWidth=1;
-    X.beginPath();X.arc(cx,cy,rn.r,0,Math.PI*2);X.stroke();}
+    X.globalAlpha=rn.life*.08;X.strokeStyle='hsl('+rn.hue+',60%,60%)';X.lineWidth=1+rn.life;
+    X.beginPath();X.arc(cx,cy,rn.r,0,Math.PI*2);X.stroke();
+    // Inner glow fill
+    if(rn.r<150){X.globalAlpha=rn.life*.02;X.fillStyle='hsl('+rn.hue+',40%,40%)';
+      X.beginPath();X.arc(cx,cy,rn.r,0,Math.PI*2);X.fill();}}
+
+  // Breath wave — large slow ripple on phase change
+  if(active&&timer<.1&&totalNotes>0){
+    const wave=timer/.1;
+    X.globalAlpha=.03*(1-wave);X.strokeStyle=phase===0?'#4488ff':'#ff8844';X.lineWidth=3;
+    X.beginPath();X.arc(cx,cy,wave*Math.max(W,H)*.5,0,Math.PI*2);X.stroke();
+  }
+
+  // Color evolution — hue shifts over time
+  const epoch=Math.floor(totalNotes/24);
+  const epochHue=(epoch*60)%360;
 
   X.globalAlpha=1;
-  document.getElementById('info').textContent=scaleName.toUpperCase()+' · '+SPEEDS[speedIdx].name.toUpperCase()+' · '+totalNotes+' notes';}
+  document.getElementById('info').textContent=scaleName.toUpperCase()+' \u00b7 '+SPEEDS[speedIdx].name.toUpperCase()+' \u00b7 '+totalNotes+' notes'+(epoch?' \u00b7 epoch '+epoch:'');}
 anim();
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="rhythm.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
