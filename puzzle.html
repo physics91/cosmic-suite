@@ -59,7 +59,37 @@ function positionNodes(){
   for(let i=0;i<nodes.length;i++){
     const a=i*Math.PI*2/nodes.length+Math.random()*.3;
     const d=r*(.6+Math.random()*.4);
-    nodes[i].ax=cx+Math.cos(a)*d;nodes[i].ay=cy+Math.sin(a)*d;}}
+    nodes[i].ax=cx+Math.cos(a)*d;nodes[i].ay=cy+Math.sin(a)*d;
+    nodes[i].vx=(Math.random()-.5)*.3;nodes[i].vy=(Math.random()-.5)*.3;
+    nodes[i].anchored=false;}}
+
+function updatePhysics(){
+  for(const n of nodes){
+    // Check if fully connected
+    const conns=userEdges.filter(e=>e[0]===n.id||e[1]===n.id).length;
+    const targetConns=edges.filter(e=>e[0]===n.id||e[1]===n.id).length;
+    n.anchored=conns===targetConns&&targetConns>0;
+    if(n.anchored){n.vx*=.9;n.vy*=.9;} // anchored nodes slow down
+    else{
+      // Drift
+      n.vx+=(Math.random()-.5)*.02;n.vy+=(Math.random()-.5)*.02;
+      n.vx*=.995;n.vy*=.995;
+    }
+    // Connected pairs attract gently
+    for(const e of userEdges){
+      const other=e[0]===n.id?nodes[e[1]]:e[1]===n.id?nodes[e[0]]:null;
+      if(!other)continue;
+      const dx=other.ax-n.ax,dy=other.ay-n.ay;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d>80){n.vx+=dx/d*.02;n.vy+=dy/d*.02;} // attract if far
+      if(d<40){n.vx-=dx/d*.01;n.vy-=dy/d*.01;} // repel if too close
+    }
+    n.ax+=n.vx;n.ay+=n.vy;
+    // Soft bounds
+    if(n.ax<40){n.vx+=.05;n.ax=40;}if(n.ax>W-40){n.vx-=.05;n.ax=W-40;}
+    if(n.ay<60){n.vy+=.05;n.ay=60;}if(n.ay>H-60){n.vy-=.05;n.ay=H-60;}
+  }
+}
 
 function findNode(x,y){
   for(let i=0;i<nodes.length;i++){const dx=nodes[i].ax-x,dy=nodes[i].ay-y;if(dx*dx+dy*dy<600)return i;}return-1;}
@@ -98,6 +128,7 @@ function nextLevel(){lvl++;generateLevel(lvl);}
 const bg=Array.from({length:80},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
 
 function anim(){requestAnimationFrame(anim);
+  updatePhysics();
   X.fillStyle='rgba(6,6,16,.15)';X.fillRect(0,0,W,H);
   // BG
   for(const s of bg){s.p+=.003;X.globalAlpha=.04+Math.sin(s.p)*.02;X.fillStyle='#fff';
@@ -120,6 +151,13 @@ function anim(){requestAnimationFrame(anim);
     X.beginPath();X.arc(n.ax,n.ay,isSel?16:10,0,Math.PI*2);X.fill();
     X.globalAlpha=isSel?.9:complete?.7:.5;X.fillStyle='#fff';
     X.beginPath();X.arc(n.ax,n.ay,isSel?5:3,0,Math.PI*2);X.fill();
+    // Anchored stability ring
+    if(complete){X.globalAlpha=.08;X.strokeStyle='#44ff88';X.lineWidth=.5;
+      X.beginPath();X.arc(n.ax,n.ay,14,0,Math.PI*2);X.stroke();}
+    // Drifting indicator for unconnected nodes
+    if(!complete&&conns===0){const drift=Math.sin(Date.now()*.003+i)*.5;
+      X.globalAlpha=.03;X.strokeStyle='#ffcc44';X.lineWidth=.3;
+      X.beginPath();X.arc(n.ax,n.ay,12+drift*4,0,Math.PI*2);X.stroke();}
     // Connection counter
     X.globalAlpha=.2;X.font='8px sans-serif';X.textAlign='center';
     X.fillText(conns+'/'+targetConns,n.ax,n.ay+20);}
