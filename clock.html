@@ -84,6 +84,10 @@ function anim(){requestAnimationFrame(anim);
   X.globalAlpha=.3;X.fillStyle='#fff';X.beginPath();X.arc(cx,cy,3,0,Math.PI*2);X.fill();
   X.globalAlpha=.05;X.beginPath();X.arc(cx,cy,15,0,Math.PI*2);X.fill();
 
+  // Week progress arc
+  const weekProg=(now.getDay()*86400+h*3600+m*60+s)/(7*86400);
+  X.globalAlpha=.02;X.strokeStyle='#6688ff';X.lineWidth=1;
+  X.beginPath();X.arc(cx,cy,R+14,-Math.PI/2,-Math.PI/2+weekProg*Math.PI*2);X.stroke();
   // Day progress arc
   const dayProg=(h*3600+m*60+s)/86400;
   X.globalAlpha=.04;X.strokeStyle='#ffcc44';X.lineWidth=2;
