@@ -27,6 +27,7 @@
   <button class="btn" onclick="hueShift=(hueShift+60)%360">Color</button>
   <button class="btn" onclick="brushSize=brushSize===1?3:brushSize===3?5:1">Brush</button>
   <button class="btn" onclick="exportMandala()">Save</button>
+  <button class="btn" id="micBtn" onclick="toggleMic()">Mic</button>
 </div>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="#" onclick="const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chat.html','clock.html','conway.html','dice.html','entropy.html','fourier.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','pendulum.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
 <script>
@@ -82,9 +83,49 @@ function drawCenter(){
     X.beginPath();X.moveTo(W/2,H/2);X.lineTo(W/2+Math.cos(a)*Math.max(W,H),H/2+Math.sin(a)*Math.max(W,H));X.stroke();}
   X.globalAlpha=1;}
 
+// === MIC → MANDALA ===
+let micActive=false,micAC=null,micAnalyser=null,micData=null,micAngle=0;
+async function toggleMic(){
+  if(micActive){micActive=false;document.getElementById('micBtn').textContent='Mic';return;}
+  try{
+    if(!micAC)micAC=new(AudioContext||webkitAudioContext)();
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const src=micAC.createMediaStreamSource(stream);
+    micAnalyser=micAC.createAnalyser();micAnalyser.fftSize=256;
+    src.connect(micAnalyser);
+    micData=new Uint8Array(micAnalyser.frequencyBinCount);
+    micActive=true;document.getElementById('micBtn').textContent='Mic ON';
+  }catch(e){micActive=false;}
+}
+
+function drawMicMandala(){
+  if(!micActive||!micAnalyser)return;
+  micAnalyser.getByteFrequencyData(micData);
+  const cx=W/2,cy=H/2;
+  micAngle+=.02;
+  // Use frequency bins as radii at different angles
+  for(let i=0;i<micData.length;i++){
+    const val=micData[i]/255;
+    if(val<.05)continue;
+    const r=30+val*Math.min(W,H)*.35;
+    const baseAngle=micAngle+i/micData.length*Math.PI*2;
+    const hue=(hueShift+i*3)%360;
+    X.globalAlpha=val*.15;X.fillStyle='hsl('+hue+',60%,60%)';
+    for(let s=0;s<symmetry;s++){
+      const a=baseAngle+s*Math.PI*2/symmetry;
+      const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
+      X.beginPath();X.arc(px,py,1+val*2,0,Math.PI*2);X.fill();
+      // Mirror
+      const ma=-(baseAngle)+s*Math.PI*2/symmetry;
+      X.beginPath();X.arc(cx+Math.cos(ma)*r,cy+Math.sin(ma)*r,1+val*2,0,Math.PI*2);X.fill();
+    }
+  }
+  X.globalAlpha=1;strokes++;
+}
+
 function anim(){requestAnimationFrame(anim);
-  drawCenter();
-  document.getElementById('sym').textContent=symmetry*2+'-fold symmetry · '+strokes+' strokes · brush '+brushSize;}
+  drawCenter();drawMicMandala();
+  document.getElementById('sym').textContent=symmetry*2+'-fold symmetry \u00b7 '+strokes+' strokes'+(micActive?' \u00b7 \u266a mic':'');}
 anim();
 
 addEventListener('keydown',e=>{
