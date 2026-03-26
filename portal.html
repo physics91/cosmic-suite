@@ -62,7 +62,9 @@ C.addEventListener('mousemove',e=>{
       document.getElementById('label').classList.add('show');document.body.style.cursor='pointer';}
     else{document.getElementById('label').classList.remove('show');document.body.style.cursor='default';}}});
 
-C.addEventListener('click',()=>{if(hovered>=0)location.href=EXP[hovered].href;});
+// Daily cosmic seed — shared DNA across all experiences
+const today=new Date();const cosmicSeed=(today.getFullYear()*10000+today.getMonth()*100+today.getDate());
+C.addEventListener('click',()=>{if(hovered>=0)location.href=EXP[hovered].href+'?seed='+cosmicSeed;});
 
 function anim(){requestAnimationFrame(anim);t+=.01;
   X.fillStyle='rgba(5,5,8,.12)';X.fillRect(0,0,W,H);
