@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DNA</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><path d='M12 6Q20 16 12 26' fill='none' stroke='%2344ff88' stroke-width='1' opacity='.5'/><path d='M20 6Q12 16 20 26' fill='none' stroke='%23ff4488' stroke-width='1' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#030310;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:grab}
+    body.dragging{cursor:grabbing}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #input-area{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:10}
+    #input-area input{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.5);padding:6px 14px;border-radius:10px;font-size:11px;outline:none;width:200px;text-align:center;letter-spacing:1px}
+    #input-area input::placeholder{color:rgba(255,255,255,.12)}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">YOUR NAME BECOMES DNA &middot; DRAG TO ROTATE</div>
+<div id="input-area"><input id="name" type="text" placeholder="type your name..." value="cosmos"></div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="randomDNA()">Random</button>
+<button class="btn" style="bottom:16px;right:85px" onclick="cycleColor()">Color: <span id="colV">Life</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="portal.html" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>document.getElementById('random-jump').onclick=function(){const e=['about.html','ant.html','art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chaos-map.html','chat.html','clock.html','conway.html','dice.html','drip.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-life.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','maze.html','memory.html','music.html','neural.html','oracle.html','orbit.html','orbits.html','order.html','pendulum.html','pi.html','puzzle.html','quine.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','spirograph.html','swarm-gravity.html','swarm-paint.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false;};</script>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// DNA bases
+const BASES=['A','T','G','C'];
+const PAIRS={A:'T',T:'A',G:'C',C:'G'};
+const BASE_COLORS={life:{A:'#ff4488',T:'#44ff88',G:'#4488ff',C:'#ffcc44'},
+  neon:{A:'#ff00ff',T:'#00ffff',G:'#ff8800',C:'#00ff00'},
+  mono:{A:'#ddd',T:'#aaa',G:'#777',C:'#444'}};
+let colorMode='life';
+const COLOR_NAMES=['life','neon','mono'];
+let colorIdx=0;
+
+// Generate DNA from text
+let sequence=[];
+function textToDNA(text){
+  sequence=[];
+  for(const ch of text.toLowerCase()){
+    const code=ch.charCodeAt(0);
+    // Each character → 3 bases (codon)
+    sequence.push(BASES[code%4]);
+    sequence.push(BASES[(code>>2)%4]);
+    sequence.push(BASES[(code>>4)%4]);
+  }
+  // Pad to at least 60
+  while(sequence.length<60)sequence.push(BASES[Math.random()*4|0]);
+}
+
+function randomDNA(){
+  sequence=[];for(let i=0;i<90;i++)sequence.push(BASES[Math.random()*4|0]);
+  document.getElementById('name').value='';
+}
+
+function cycleColor(){colorIdx=(colorIdx+1)%COLOR_NAMES.length;colorMode=COLOR_NAMES[colorIdx];document.getElementById('colV').textContent=colorMode.charAt(0).toUpperCase()+colorMode.slice(1);}
+
+document.getElementById('name').addEventListener('input',e=>{textToDNA(e.target.value||'cosmos');});
+textToDNA('cosmos');
+
+// 3D rotation
+let rotY=0,rotX=.3,dragging=false,lastMX=0,lastMY=0;
+C.addEventListener('mousedown',e=>{dragging=true;lastMX=e.clientX;lastMY=e.clientY;document.body.classList.add('dragging');});
+addEventListener('mousemove',e=>{if(!dragging)return;rotY+=(e.clientX-lastMX)*.005;rotX+=(e.clientY-lastMY)*.005;lastMX=e.clientX;lastMY=e.clientY;});
+addEventListener('mouseup',()=>{dragging=false;document.body.classList.remove('dragging');});
+addEventListener('keydown',e=>{if(e.key==='f'&&!e.target.closest('input'))document.documentElement.requestFullscreen().catch(()=>{});});
+
+let time=0;
+function anim(){requestAnimationFrame(anim);time+=.01;
+  if(!dragging)rotY+=.008;
+
+  X.fillStyle='rgba(3,3,16,.08)';X.fillRect(0,0,W,H);
+  const cx=W/2,cy=H/2;
+  const colors=BASE_COLORS[colorMode];
+  const n=sequence.length;
+  const spacing=8;
+  const radius=40;
+
+  // Collect all elements for depth sorting
+  const elements=[];
+
+  for(let i=0;i<n;i++){
+    const y3d=(i-n/2)*spacing;
+    const angle=i*.3+time*2;
+
+    // Strand 1
+    const x1=Math.cos(angle)*radius;
+    const z1=Math.sin(angle)*radius;
+    // Strand 2
+    const x2=Math.cos(angle+Math.PI)*radius;
+    const z2=Math.sin(angle+Math.PI)*radius;
+
+    // Rotate
+    const cosY=Math.cos(rotY),sinY=Math.sin(rotY);
+    const cosX=Math.cos(rotX),sinX=Math.sin(rotX);
+
+    function project(px,py,pz){
+      let rx=px*cosY+pz*sinY;let rz=-px*sinY+pz*cosY;
+      let ry=py*cosX-rz*sinX;rz=py*sinX+rz*cosX;
+      const scale=300/(300+rz);
+      return{x:cx+rx*scale,y:cy+ry*scale,z:rz,s:scale};
+    }
+
+    const p1=project(x1,y3d,z1);
+    const p2=project(x2,y3d,z2);
+    const base=sequence[i];
+    const pair=PAIRS[base];
+
+    // Base pair rung
+    elements.push({type:'rung',x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,z:(p1.z+p2.z)/2,
+      c1:colors[base],c2:colors[pair],base,pair});
+
+    // Backbone nodes
+    elements.push({type:'node',x:p1.x,y:p1.y,z:p1.z,s:p1.s,color:colors[base],base,strand:1});
+    elements.push({type:'node',x:p2.x,y:p2.y,z:p2.z,s:p2.s,color:colors[pair],base:pair,strand:2});
+
+    // Backbone connections
+    if(i>0){
+      const prevAngle=(i-1)*.3+time*2;
+      const prevY=(i-1-n/2)*spacing;
+      const pp1=project(Math.cos(prevAngle)*radius,prevY,Math.sin(prevAngle)*radius);
+      const pp2=project(Math.cos(prevAngle+Math.PI)*radius,prevY,Math.sin(prevAngle+Math.PI)*radius);
+      elements.push({type:'bone',x1:pp1.x,y1:pp1.y,x2:p1.x,y2:p1.y,z:(pp1.z+p1.z)/2,strand:1});
+      elements.push({type:'bone',x1:pp2.x,y1:pp2.y,x2:p2.x,y2:p2.y,z:(pp2.z+p2.z)/2,strand:2});
+    }
+  }
+
+  // Depth sort
+  elements.sort((a,b)=>b.z-a.z);
+
+  // Draw
+  for(const e of elements){
+    const depth=Math.max(0,Math.min(1,(e.z+100)/200));
+    if(e.type==='bone'){
+      X.globalAlpha=.1+depth*.15;X.strokeStyle=e.strand===1?'rgba(255,100,150,.4)':'rgba(100,255,150,.4)';
+      X.lineWidth=1+depth;X.beginPath();X.moveTo(e.x1,e.y1);X.lineTo(e.x2,e.y2);X.stroke();
+    }else if(e.type==='rung'){
+      X.globalAlpha=.06+depth*.08;X.strokeStyle='rgba(255,255,255,.3)';X.lineWidth=.5;
+      X.beginPath();X.moveTo(e.x1,e.y1);X.lineTo(e.x2,e.y2);X.stroke();
+    }else if(e.type==='node'){
+      const sz=2+depth*2;
+      X.globalAlpha=.15+depth*.3;X.fillStyle=e.color;
+      X.beginPath();X.arc(e.x,e.y,sz*(e.s||1),0,Math.PI*2);X.fill();
+      // Base letter
+      if(depth>.3){X.globalAlpha=depth*.15;X.fillStyle='#fff';X.font='7px monospace';X.textAlign='center';
+        X.fillText(e.base,e.x,e.y-sz-3);}
+    }
+  }
+
+  X.globalAlpha=1;
+  const name=document.getElementById('name').value||'random';
+  document.getElementById('stats').textContent=
+    'sequence: '+sequence.length+' bases\ncodons: '+Math.floor(sequence.length/3)+'\nsource: '+name;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="dna.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
