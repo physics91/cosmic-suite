@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entropy</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='10' y='10' width='12' height='12' fill='none' stroke='%23fff' stroke-width='.8' opacity='.3'/><circle cx='22' cy='10' r='2' fill='%23ff4444' opacity='.4'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#050508;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:none}
+    canvas{display:block}
+    #entropy-bar{position:fixed;left:20px;top:50%;transform:translateY(-50%);width:6px;height:60vh;background:rgba(255,255,255,.03);border-radius:3px;z-index:2;overflow:hidden}
+    #entropy-fill{position:absolute;bottom:0;width:100%;background:linear-gradient(to top,#4488ff,#ff4444);border-radius:3px;transition:height .3s}
+    #entropy-label{position:fixed;left:12px;top:calc(50% + 32vh);color:rgba(255,255,255,.1);font-size:7px;letter-spacing:2px;z-index:2;transform:rotate(-90deg);transform-origin:center}
+    #state{position:fixed;top:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:10px;letter-spacing:4px;z-index:2;pointer-events:none;transition:color .5s}
+    #quote{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.08);font-size:10px;letter-spacing:1px;z-index:2;pointer-events:none;max-width:500px;text-align:center;font-style:italic;transition:opacity 1s}
+    #time-arrow{position:fixed;right:20px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.04);font-size:60px;z-index:1;pointer-events:none}
+    #stats{position:fixed;bottom:16px;right:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;text-align:right}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="entropy-bar"><div id="entropy-fill"></div></div>
+<div id="entropy-label">ENTROPY</div>
+<div id="state">ORDER</div>
+<div id="quote"></div>
+<div id="time-arrow">&darr;</div>
+<div id="stats"></div>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+
+// === PARTICLES ===
+const N=400;
+let particles=[];
+
+function resize(){W=C.width=innerWidth;H=C.height=innerHeight;initParticles();}
+resize();addEventListener('resize',resize);
+let entropy=0; // 0 = perfect order, 1 = maximum chaos
+let mouseX=W/2,mouseY=H/2,mouseActive=false;
+let orderForce=0; // how much user is imposing order
+let time=0,phase='order'; // order, transition, chaos, heat-death
+
+const QUOTES=[
+  'The entropy of the universe tends to a maximum. \u2014 Clausius',
+  'The second law is the most universal law of physics. \u2014 Eddington',
+  'Life is nothing but an electron looking for a place to rest. \u2014 Szent-Gy\u00f6rgyi',
+  'We are a way for the cosmos to know itself. \u2014 Sagan',
+  'Order is merely the dream of the universe before it wakes. \u2014 Unknown',
+  'Every act of creation is first an act of destruction. \u2014 Picasso',
+  'Chaos is rejecting all you have learned. Chaos is being yourself. \u2014 Vonnegut',
+  'In the midst of chaos, there is also opportunity. \u2014 Sun Tzu',
+];
+let currentQuote=0,quoteTimer=0;
+
+function initParticles(){
+  particles=[];
+  const cols=Math.ceil(Math.sqrt(N*W/H));
+  const rows=Math.ceil(N/cols);
+  for(let i=0;i<N;i++){
+    const col=i%cols,row=Math.floor(i/cols);
+    const ox=W*.1+col/(cols-1)*W*.8;
+    const oy=H*.1+row/(rows-1)*H*.8;
+    particles.push({
+      x:ox,y:oy,
+      ox:ox,oy:oy, // original ordered position
+      vx:0,vy:0,
+      hue:220, // blue=order
+      targetHue:220,
+      size:3,
+      entropy:0, // individual entropy
+    });
+  }
+}
+initParticles();
+
+// === INPUT ===
+addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY;mouseActive=true;});
+addEventListener('mousedown',()=>{orderForce=1;});
+addEventListener('mouseup',()=>{orderForce=0;});
+addEventListener('touchstart',e=>{mouseX=e.touches[0].clientX;mouseY=e.touches[0].clientY;mouseActive=true;orderForce=1;},{passive:true});
+addEventListener('touchmove',e=>{mouseX=e.touches[0].clientX;mouseY=e.touches[0].clientY;},{passive:true});
+addEventListener('touchend',()=>{orderForce=0;});
+addEventListener('keydown',e=>{
+  if(e.key==='r'){entropy=0;initParticles();phase='order';}
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key===' '){e.preventDefault();orderForce=orderForce?0:1;}
+});
+
+// === ENTROPY CALCULATION ===
+function calcEntropy(){
+  let totalDisorder=0;
+  for(const p of particles){
+    const dx=p.x-p.ox,dy=p.y-p.oy;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const maxDist=Math.sqrt(W*W+H*H)*.5;
+    p.entropy=Math.min(1,dist/maxDist);
+    totalDisorder+=p.entropy;
+    // Speed adds entropy
+    const speed=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
+    totalDisorder+=Math.min(.5,speed*.05);
+  }
+  return Math.min(1,totalDisorder/N);
+}
+
+// === PHASE DETECTION ===
+function detectPhase(e){
+  if(e<.15)return'order';
+  if(e<.4)return'transition';
+  if(e<.85)return'chaos';
+  return'heat-death';
+}
+
+// === AUDIO ===
+let aC=null;
+function initAudio(){if(!aC)aC=new(AudioContext||webkitAudioContext)();}
+function playOrderTick(){
+  if(!aC)return;
+  const t=aC.currentTime;
+  const o=aC.createOscillator(),g=aC.createGain();
+  o.type='sine';o.frequency.value=800-entropy*600;
+  g.gain.setValueAtTime(.01,t);g.gain.exponentialRampToValueAtTime(.001,t+.1);
+  o.connect(g);g.connect(aC.destination);o.start(t);o.stop(t+.1);
+}
+
+// === RENDER ===
+let frame=0;
+function anim(){requestAnimationFrame(anim);frame++;time+=.016;
+
+  // Background — gets warmer with entropy
+  const bgR=5+entropy*8,bgG=5+entropy*3,bgB=8-entropy*4;
+  X.fillStyle='rgba('+bgR+','+bgG+','+bgB+',.1)';
+  X.fillRect(0,0,W,H);
+
+  // Natural entropy increase (second law)
+  const entropyForce=.0003+entropy*.0001;
+
+  // Update particles
+  for(const p of particles){
+    // Random thermal motion (entropy source)
+    p.vx+=(Math.random()-.5)*entropyForce*10;
+    p.vy+=(Math.random()-.5)*entropyForce*10;
+
+    // Natural diffusion
+    p.vx*=.998;p.vy*=.998;
+
+    // Order force from mouse — attract to grid
+    if(orderForce&&mouseActive){
+      const dx=mouseX-p.x,dy=mouseY-p.y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<200){
+        const strength=.03*(1-d/200);
+        // Push toward original position
+        p.vx+=(p.ox-p.x)*strength*.1;
+        p.vy+=(p.oy-p.y)*strength*.1;
+        // Also attract to mouse briefly
+        p.vx+=dx/d*strength*.5;
+        p.vy+=dy/d*strength*.5;
+      }
+    }
+
+    // Without order force, add more chaos
+    if(!orderForce){
+      p.vx+=(Math.random()-.5)*entropyForce*20;
+      p.vy+=(Math.random()-.5)*entropyForce*20;
+    }
+
+    // Boundaries — soft bounce
+    if(p.x<10){p.vx+=.1;p.x=10;}
+    if(p.x>W-10){p.vx-=.1;p.x=W-10;}
+    if(p.y<10){p.vy+=.1;p.y=10;}
+    if(p.y>H-10){p.vy-=.1;p.y=H-10;}
+
+    p.x+=p.vx;p.y+=p.vy;
+
+    // Color — blue=order, red=chaos
+    p.targetHue=220-p.entropy*220; // 220(blue) -> 0(red)
+    p.hue+=(p.targetHue-p.hue)*.05;
+
+    // Size — grows with entropy (heat death = diffuse)
+    p.size=2+p.entropy*3;
+  }
+
+  // Calculate global entropy
+  entropy=calcEntropy();
+  phase=detectPhase(entropy);
+
+  // Draw particles
+  for(const p of particles){
+    const alpha=phase==='heat-death'?.03+Math.sin(time+p.x*.01)*.01:.15+p.entropy*.1;
+    X.globalAlpha=alpha;
+    X.fillStyle='hsl('+p.hue+','+Math.round(60+p.entropy*20)+'%,'+Math.round(50+p.entropy*10)+'%)';
+    X.beginPath();X.arc(p.x,p.y,p.size,0,Math.PI*2);X.fill();
+
+    // Connections in ordered state
+    if(entropy<.3){
+      const nearest=findNearest(p,particles,40);
+      if(nearest){
+        X.globalAlpha=.02*(1-entropy/.3);
+        X.strokeStyle='rgba(100,150,255,.3)';X.lineWidth=.5;
+        X.beginPath();X.moveTo(p.x,p.y);X.lineTo(nearest.x,nearest.y);X.stroke();
+      }
+    }
+  }
+
+  // Mouse cursor — order beacon
+  if(mouseActive){
+    X.globalAlpha=orderForce?.12:.03;
+    const cg=X.createRadialGradient(mouseX,mouseY,0,mouseX,mouseY,orderForce?200:50);
+    cg.addColorStop(0,orderForce?'rgba(100,150,255,.2)':'rgba(255,255,255,.1)');
+    cg.addColorStop(1,'rgba(0,0,0,0)');
+    X.fillStyle=cg;X.beginPath();X.arc(mouseX,mouseY,orderForce?200:50,0,Math.PI*2);X.fill();
+    // Cross cursor
+    X.globalAlpha=.1;X.strokeStyle='#fff';X.lineWidth=.5;
+    X.beginPath();X.moveTo(mouseX-8,mouseY);X.lineTo(mouseX+8,mouseY);
+    X.moveTo(mouseX,mouseY-8);X.lineTo(mouseX,mouseY+8);X.stroke();
+  }
+
+  // Heat death particles — ghostly
+  if(phase==='heat-death'&&frame%30===0){
+    for(const p of particles){
+      p.vx*=.99;p.vy*=.99; // everything slows
+    }
+  }
+
+  X.globalAlpha=1;
+
+  // UI updates
+  document.getElementById('entropy-fill').style.height=Math.round(entropy*100)+'%';
+  const stateEl=document.getElementById('state');
+  const states={order:'ORDER',transition:'TRANSITION',chaos:'CHAOS','heat-death':'HEAT DEATH'};
+  const stateColors={order:'rgba(100,150,255,.3)',transition:'rgba(200,180,100,.3)',chaos:'rgba(255,100,80,.3)','heat-death':'rgba(100,100,100,.15)'};
+  stateEl.textContent=states[phase];stateEl.style.color=stateColors[phase];
+
+  // Quotes cycle
+  quoteTimer+=.016;
+  if(quoteTimer>8){
+    quoteTimer=0;currentQuote=(currentQuote+1)%QUOTES.length;
+    document.getElementById('quote').textContent=QUOTES[currentQuote];
+  }
+
+  // Stats
+  document.getElementById('stats').textContent=
+    'entropy: '+entropy.toFixed(3)+'\nphase: '+phase+'\nparticles: '+N+'\npress R to reset';
+
+  // Occasional sound
+  if(frame%60===0&&orderForce){initAudio();playOrderTick();}
+}
+
+function findNearest(p,arr,maxDist){
+  let best=null,bd=maxDist*maxDist;
+  for(const q of arr){
+    if(q===p)continue;
+    const dx=p.x-q.x,dy=p.y-q.y;
+    const d2=dx*dx+dy*dy;
+    if(d2<bd){bd=d2;best=q;}
+  }
+  return best;
+}
+
+// Initial quote
+document.getElementById('quote').textContent=QUOTES[0];
+
+anim();
+</script>
+</body>
+</html>
