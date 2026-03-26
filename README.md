@@ -2,7 +2,7 @@
 
 ![Lines](https://img.shields.io/badge/lines-7700+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-24_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-150+-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**26 cosmic experiences in pure HTML. No dependencies.**
+**27 cosmic experiences in pure HTML. No dependencies.**
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -36,6 +36,7 @@
 | 〰 | **Fourier** | Draw waveforms · hear shapes · see sound | Create |
 | 🎵 | **Gravity Beats** | Rhythm in warped spacetime · notes bend around wells | Play |
 | ♨ | **Entropy** | Watch order dissolve · fight the second law | Feel |
+| 〰 | **Interference** | Wave interference · double slit · draw walls | Think |
 
 ## Quick Start
 
