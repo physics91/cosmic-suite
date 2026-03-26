@@ -97,7 +97,9 @@ function anim(){requestAnimationFrame(anim);t+=.01;
   X.globalAlpha=.06;const sg=X.createRadialGradient(cx,cy,0,cx,cy,50);
   sg.addColorStop(0,'rgba(255,255,255,.3)');sg.addColorStop(1,'rgba(0,0,0,0)');
   X.fillStyle=sg;X.beginPath();X.arc(cx,cy,50,0,Math.PI*2);X.fill();
-  X.globalAlpha=.5;X.fillStyle='#fff';X.beginPath();X.arc(cx,cy,4,0,Math.PI*2);X.fill();
+  const pulse=3+Math.sin(t*2)*1.5;
+  X.globalAlpha=.5;X.fillStyle='#fff';X.beginPath();X.arc(cx,cy,pulse,0,Math.PI*2);X.fill();
+  X.globalAlpha=.02;X.beginPath();X.arc(cx,cy,pulse*8,0,Math.PI*2);X.fill();
   // Orbit rings
   for(const exp of EXP){const r=60+exp.orbit*30;
     X.globalAlpha=.015;X.strokeStyle='#fff';X.lineWidth=.5;
