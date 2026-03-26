@@ -1,10 +1,10 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-14000+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-46_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-200-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-14500+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-48_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-207-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**45 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
+**47 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
 
-> *200 commits. 14,000 lines. Zero dependencies. From nothing, everything.*
+> *From nothing, everything.*
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -25,6 +25,7 @@
 | 〰 | **Fourier** | Draw waveforms · hear shapes · see sound |
 | ∞ | **Harmonograph** | Pendulum × Fourier · Victorian science art |
 | ♫ | **Cellular Music** | Automata × Music · rules become melodies |
+| ☉ | **Spirograph** | Gears within gears · hypotrochoid curves |
 
 ### Think
 | | Name | What |
@@ -48,6 +49,7 @@
 | ✸ | **Fractal** | Mandelbrot · Julia set · infinite zoom · 6 palettes |
 | ≡ | **Sorting** | 7 algorithms visualized · hear the sort |
 | π | **Pi Walk** | Walk through π/e/φ digits as directions |
+| ▒ | **Chaos Map** | Fractal × Pendulum · flip time boundary |
 
 ### Play
 | | Name | What |
@@ -94,20 +96,36 @@ index.html           — Digital Cosmos (4679 lines, the flagship)
 
 ## Stats
 
-- **~14,000 lines** of hand-written code
-- **46 HTML files**, each fully self-contained
-- **200 git commits**
+- **~14,500 lines** of hand-written code
+- **48 HTML files**, each fully self-contained
+- **207 git commits** over 24 hours
 - **0 external dependencies**
 - **60 FPS** across all experiences
-- **45 unique experiences** across 4 categories
+- **47 unique experiences** across 4 categories
 - **10 cross-experience achievements**
 - **Random navigation** between all experiences
-- **1 easter egg** (hint: 42)
 - **Musica Universalis** — portal plays music when you hover planets
+- **Universe age** counter — real-time since first commit
+- **1 easter egg** (hint: 42)
 
 ## Tech
 
-Pure HTML + CSS + JavaScript. Canvas 2D. Web Audio API (procedural synthesis, binaural beats, reverb). localStorage. BroadcastChannel. MediaRecorder. Mic input (autocorrelation pitch detection, breath analysis). CSS 3D transforms. Parametric surface rendering. 2D wave equation. Cellular automata. FBM noise. N-body gravity. Fourier transform. Zero frameworks.
+Pure HTML + CSS + JavaScript. Canvas 2D. Web Audio API (procedural synthesis, binaural beats, reverb). localStorage. BroadcastChannel. MediaRecorder. Mic input (autocorrelation pitch detection, breath analysis). CSS 3D transforms. Parametric surface rendering. 2D wave equation. Cellular automata. Reaction-diffusion. FBM noise. N-body gravity. Fourier transform. Boids flocking. Strange attractors. Fractal rendering. Double pendulum physics. Gray-Scott morphogenesis. Simulated annealing. Neural signal propagation. Zero frameworks.
+
+## What This Project Learned
+
+Each iteration ended with "the universe learned..." — here are some favorites:
+
+- *Changing perspective makes the same game a completely different experience*
+- *All complex shapes are sums of simple waves*
+- *Light itself loses its way before something heavy*
+- *Only 3 rules create infinite complexity*
+- *Chaos is not random — there are points chaos never visits*
+- *A leader is not needed — each just needs to see their neighbor*
+- *The boundary between order and chaos is fractal*
+- *To find optimal order, you must first get hot enough*
+- *Every word is a descendant of another word*
+- *z² + c — two characters contain infinity*
 
 ## License
 
