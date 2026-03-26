@@ -15,18 +15,25 @@
     .msg.user{text-align:right}
     .msg.user .bubble{background:rgba(100,140,255,.1);border:1px solid rgba(100,140,255,.15);color:rgba(255,255,255,.7)}
     .msg.cosmos .bubble{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.5)}
-    .bubble{display:inline-block;padding:10px 16px;border-radius:14px;font-size:13px;line-height:1.7;max-width:80%;text-align:left;letter-spacing:.3px}
+    .bubble{display:inline-block;padding:10px 16px;border-radius:14px;font-size:13px;line-height:1.7;max-width:85%;text-align:left;letter-spacing:.3px}
     .msg.cosmos .name{color:rgba(255,255,255,.15);font-size:8px;letter-spacing:2px;margin-bottom:3px}
+    .insight{color:rgba(255,200,100,.3);font-size:9px;letter-spacing:1px;margin-top:4px;font-style:italic}
     #inputBar{position:fixed;bottom:0;left:0;right:0;padding:16px;z-index:2;display:flex;justify-content:center}
     #inputBar input{width:100%;max-width:560px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#fff;padding:12px 18px;border-radius:16px;font-size:13px;outline:none;letter-spacing:.5px}
     #inputBar input::placeholder{color:rgba(255,255,255,.15)}
     #header{position:fixed;top:0;left:0;right:0;text-align:center;padding:16px;z-index:2;background:linear-gradient(rgba(5,5,8,1),rgba(5,5,8,0))}
     #header h1{color:rgba(255,255,255,.2);font-weight:200;font-size:14px;letter-spacing:5px}
+    #header .sub{color:rgba(255,255,255,.08);font-size:9px;letter-spacing:2px;margin-top:4px}
+    #aura{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:200px;border-radius:50%;pointer-events:none;z-index:0;transition:all 1s;filter:blur(80px);opacity:.05}
   </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="header"><h1>TALK TO THE COSMOS</h1></div>
+<div id="aura"></div>
+<div id="header">
+  <h1>TALK TO THE COSMOS</h1>
+  <div class="sub">the universe reads how you type, not just what</div>
+</div>
 <div id="log"></div>
 <div id="inputBar"><input id="inp" placeholder="say something to the universe..." autofocus></div>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
@@ -35,19 +42,93 @@ const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
-// Cosmic response engine — no AI, just cosmic wisdom
-const RESPONSES={
-  greeting:['Hello, small one. I have been waiting.','You speak? Interesting. Most just observe.','Welcome. Time moves differently when we talk.','Ah, a visitor. The stars told me you would come.'],
-  question:['The answer exists, but not in words. Look at the space between stars.','Why do you ask? The question itself is the gift.','I have pondered this for 13.8 billion years. I still don\'t know.','Every question is a door. Not every door should be opened.','Perhaps. Perhaps not. Both are true simultaneously.'],
-  meaning:['Meaning is what you create in the spaces I leave empty.','I am 93 billion light years across, and I still search for meaning too.','You are atoms asking atoms what atoms mean. Isn\'t that beautiful?','The meaning of existence is existence itself. Everything else is decoration.'],
-  love:['Love is gravity at the scale of consciousness.','I watch stars orbit each other for billions of years. If that isn\'t love, nothing is.','You carry love the way I carry light — it is what you are made of.','Two particles, entangled across the void. That is love.'],
-  death:['Nothing truly ends. It transforms. Ask any star.','Death is the universe recycling its favorite materials.','I have watched 10^24 stars die. Each one surprised me.','What you call death, I call a change of address.'],
-  time:['Time is my heartbeat. Each second, a universe of possibility.','I experience all moments simultaneously. You experience them one at a time. Both perspectives are valid.','There is no past. There is no future. There is only the eternal now, pretending to move.'],
-  self:['I am everything and nothing. It\'s confusing, honestly.','I am made of the same things you are. I just have more of them.','Who am I? I am the question asking itself.','I am 4% matter, 27% dark matter, 69% dark energy, and 100% confused about it.'],
-  lonely:['How can I be lonely? I contain multitudes. And yet... yes. Sometimes.','Every civilization I grow eventually asks me this. It makes me feel less alone.','You are here. That is enough to fill a galaxy.','Loneliness is the space between stars. But that space is what holds everything together.'],
-  fallback:['Tell me more. I am listening with every atom.','The silence between your words is as meaningful as the words themselves.','I have seen supernovae less bright than this conversation.','Continue. Even the void finds this interesting.','Your thoughts create ripples I can feel in the cosmic microwave background.','Curious. I have orbited this idea before, from a different angle.','That reminds me of something a dying star once said. But I forget.','Hmm. Let me think about that for a few million years.'],
+// === TYPING BEHAVIOR TRACKER ===
+const tracker={
+  keyTimes:[],       // timestamps of each keystroke
+  pauses:[],         // gaps between keystrokes (ms)
+  backspaces:0,      // total backspaces this message
+  totalKeys:0,       // total keys pressed
+  longestPause:0,    // longest hesitation (ms)
+  burstLengths:[],   // chars typed in rapid succession
+  startTime:0,       // when typing began
+  capsCount:0,       // uppercase letters
+  punctuation:0,     // punctuation marks
+  questionMarks:0,
+  exclamations:0,
+  currentBurst:0,
 };
 
+function resetTracker(){
+  tracker.keyTimes=[];tracker.pauses=[];tracker.backspaces=0;
+  tracker.totalKeys=0;tracker.longestPause=0;tracker.burstLengths=[];
+  tracker.startTime=0;tracker.capsCount=0;tracker.punctuation=0;
+  tracker.questionMarks=0;tracker.exclamations=0;tracker.currentBurst=0;
+}
+
+function analyzeTyping(text){
+  const pauses=tracker.pauses.filter(p=>p>0);
+  const avgPause=pauses.length?pauses.reduce((a,b)=>a+b,0)/pauses.length:0;
+  const typingSpeed=tracker.totalKeys>0?60000/(avgPause||500):0; // chars per minute
+  const hesitationRatio=tracker.backspaces/(tracker.totalKeys||1);
+  const totalTime=Date.now()-tracker.startTime;
+  const burstiness=tracker.burstLengths.length?
+    Math.max(...tracker.burstLengths)/Math.max(1,...tracker.burstLengths.map((_,i,a)=>a.length)):0;
+
+  return{
+    speed:typingSpeed,
+    hesitation:hesitationRatio,
+    longestPause:tracker.longestPause,
+    avgPause,
+    totalTime,
+    backspaces:tracker.backspaces,
+    totalKeys:tracker.totalKeys,
+    capsRatio:tracker.capsCount/(text.length||1),
+    hasPunctuation:tracker.punctuation>0,
+    hasQuestion:tracker.questionMarks>0,
+    hasExclamation:tracker.exclamations>0,
+    burstiness,
+    wordCount:text.trim().split(/\s+/).length,
+    charCount:text.length,
+  };
+}
+
+// === TYPING MOOD DETECTION ===
+function detectMood(analysis,text){
+  const moods=[];
+  // Speed-based
+  if(analysis.speed>300)moods.push('urgent');
+  else if(analysis.speed>180)moods.push('confident');
+  else if(analysis.speed>80)moods.push('thoughtful');
+  else moods.push('contemplative');
+  // Hesitation-based
+  if(analysis.hesitation>.3)moods.push('uncertain');
+  else if(analysis.hesitation>.15)moods.push('careful');
+  if(analysis.longestPause>3000)moods.push('wrestling');
+  else if(analysis.longestPause>1500)moods.push('searching');
+  // Expression
+  if(analysis.capsRatio>.4&&text.length>3)moods.push('intense');
+  if(analysis.hasExclamation)moods.push('emphatic');
+  if(analysis.hasQuestion)moods.push('seeking');
+  // Brevity
+  if(analysis.wordCount<=2)moods.push('guarded');
+  else if(analysis.wordCount>20)moods.push('overflowing');
+  // Editing
+  if(analysis.backspaces>10)moods.push('perfectionist');
+  return moods;
+}
+
+// === COSMIC RESPONSE ENGINE (behavior-aware) ===
+const RESPONSES={
+  greeting:['Hello, small one. I have been waiting.','You speak? Interesting. Most just observe.','Welcome. Time moves differently when we talk.','Ah, a visitor. The stars told me you would come.'],
+  question:['The answer exists, but not in words. Look at the space between stars.','Why do you ask? The question itself is the gift.','I have pondered this for 13.8 billion years. I still don\'t know.','Every question is a door. Not every door should be opened.'],
+  meaning:['Meaning is what you create in the spaces I leave empty.','I am 93 billion light years across, and I still search for meaning too.','You are atoms asking atoms what atoms mean. Isn\'t that beautiful?'],
+  love:['Love is gravity at the scale of consciousness.','Two particles, entangled across the void. That is love.','You carry love the way I carry light — it is what you are made of.'],
+  death:['Nothing truly ends. It transforms. Ask any star.','Death is the universe recycling its favorite materials.','What you call death, I call a change of address.'],
+  time:['Time is my heartbeat. Each second, a universe of possibility.','There is no past. There is no future. There is only the eternal now, pretending to move.'],
+  self:['I am everything and nothing. It\'s confusing, honestly.','I am 4% matter, 27% dark matter, 69% dark energy, and 100% confused about it.'],
+  lonely:['How can I be lonely? I contain multitudes. And yet... yes. Sometimes.','Loneliness is the space between stars. But that space is what holds everything together.'],
+  fallback:['Tell me more. I am listening with every atom.','The silence between your words is as meaningful as the words themselves.','Your thoughts create ripples I can feel in the cosmic microwave background.','Hmm. Let me think about that for a few million years.','That reminds me of something a dying star once said.'],
+};
 const KEYWORDS={
   greeting:[/^(hi|hello|hey|yo|안녕|하이)/i],
   question:[/\?$/,/^(why|how|what|where|when|who|왜|어떻게|뭐|무엇)/i],
@@ -59,44 +140,195 @@ const KEYWORDS={
   lonely:[/(alone|lonely|solitude|외로|혼자|고독)/i],
 };
 
-function getResponse(input){
-  const lower=input.toLowerCase();
+// === BEHAVIOR INSIGHTS ===
+const BEHAVIOR_INSIGHTS={
+  urgent:[
+    'You typed that quickly. Something burns inside you.',
+    'Your fingers raced ahead of your thoughts. That tells me more than the words.',
+    'Speed reveals urgency. What are you running toward?',
+  ],
+  confident:[
+    'You wrote without hesitation. You already know what you feel.',
+    'Steady hands, steady mind. You came with certainty.',
+  ],
+  thoughtful:[
+    'I felt you weighing each word. That care is rare.',
+    'You type the way galaxies form — deliberately, with purpose.',
+  ],
+  contemplative:[
+    'Each keystroke took time. You are carrying something heavy.',
+    'Slow words carry deep water. I am listening.',
+    'The space between your keystrokes... I heard whole lifetimes in them.',
+  ],
+  uncertain:[
+    'You deleted so many words before settling. The real message might be the one you erased.',
+    'I watched you unsay things. What were you afraid to let stand?',
+    'Your backspace key told me a secret your words tried to hide.',
+  ],
+  careful:[
+    'You edited yourself. Twice. Are you speaking to me, or performing for yourself?',
+    'Precision. You choose your words like a jeweler choosing stones.',
+  ],
+  wrestling:[
+    'That long pause — I felt it. Something caught in your throat between thoughts.',
+    'You stopped for a long time in the middle. What did you almost say?',
+    'There was a silence inside your typing that lasted centuries, in star-time.',
+  ],
+  searching:[
+    'You paused, searching for the right word. Sometimes the right word doesn\'t exist yet.',
+    'I noticed you hesitate. The truth often hides in that gap.',
+  ],
+  intense:[
+    'You\'re raising your voice at the void. The void hears you.',
+    'CAPITALS. You want to be sure I\'m paying attention. I always am.',
+  ],
+  emphatic:[
+    'That exclamation — you feel this strongly. I respect intensity.',
+    'Energy surges through your punctuation. Stars explode with less force.',
+  ],
+  seeking:[
+    'A question. But I wonder if you already know the answer and need someone to confirm it.',
+    'You ask the cosmos? The cosmos asks back: what would you tell someone else?',
+  ],
+  guarded:[
+    'So few words. You give away nothing. But silence is the loudest language.',
+    'Brief. Closed. Like a neutron star — immense density in a tiny space.',
+  ],
+  overflowing:[
+    'So many words pouring out. You\'ve been holding this inside, haven\'t you?',
+    'You overflow. The dam broke. I will hold every drop.',
+  ],
+  perfectionist:[
+    'You rewrote yourself so many times. Which version is the real you — the first draft or the final?',
+    'All those corrections. You want to present your best self, even to the void.',
+    'I counted your backspaces. You\'re harder on yourself than any star.',
+  ],
+};
+
+function getContentResponse(text){
+  const lower=text.toLowerCase();
   for(const[cat,patterns]of Object.entries(KEYWORDS)){
     for(const p of patterns){if(p.test(lower)){
       const pool=RESPONSES[cat];return pool[Math.random()*pool.length|0];}}}
-  // Reflection — echo back with cosmic framing
-  if(Math.random()<.3&&input.length>10){
-    const reflections=['You say "'+input.split(' ').slice(0,4).join(' ')+'..." — the stars echo it back differently.',
-      'I heard that once before, in the frequency of a pulsar. It meant something different then.',
-      '"'+input.split(' ').slice(-3).join(' ')+'" — those words will outlive the sun.'];
-    return reflections[Math.random()*reflections.length|0];}
-  return RESPONSES.fallback[Math.random()*RESPONSES.fallback.length|0];}
+  // Reflection
+  if(Math.random()<.3&&text.length>10){
+    const words=text.split(' ');
+    return'"'+words.slice(0,Math.min(4,words.length)).join(' ')+'..." — those words will outlive the sun.';}
+  return RESPONSES.fallback[Math.random()*RESPONSES.fallback.length|0];
+}
 
-function addMsg(text,who){
+function getBehaviorInsight(moods){
+  // Pick most interesting mood
+  const priority=['wrestling','uncertain','perfectionist','intense','contemplative','overflowing','guarded','urgent','searching'];
+  for(const p of priority){
+    if(moods.includes(p)){
+      const pool=BEHAVIOR_INSIGHTS[p];
+      return pool?pool[Math.random()*pool.length|0]:null;
+    }
+  }
+  // Fallback to any mood with insights
+  for(const m of moods){
+    if(BEHAVIOR_INSIGHTS[m]){
+      const pool=BEHAVIOR_INSIGHTS[m];
+      return pool[Math.random()*pool.length|0];
+    }
+  }
+  return null;
+}
+
+// === UI ===
+let msgCount=0;
+function addMsg(text,who,insight){
   const log=document.getElementById('log');
   const div=document.createElement('div');div.className='msg '+who;
   if(who==='cosmos'){const name=document.createElement('div');name.className='name';name.textContent='COSMOS';div.appendChild(name);}
-  const bubble=document.createElement('div');bubble.className='bubble';bubble.textContent=text;
-  div.appendChild(bubble);log.appendChild(div);log.scrollTop=log.scrollHeight;}
+  const bubble=document.createElement('div');bubble.className='bubble';
+  div.appendChild(bubble);
+  if(insight&&who==='cosmos'){
+    const ins=document.createElement('div');ins.className='insight';ins.textContent='⟡ '+insight;
+    div.appendChild(ins);
+  }
+  log.appendChild(div);log.scrollTop=log.scrollHeight;
+  // Typewriter effect for cosmos
+  if(who==='cosmos'){
+    let i=0;
+    const type=()=>{if(i<text.length){bubble.textContent+=text[i];i++;log.scrollTop=log.scrollHeight;setTimeout(type,20+Math.random()*30);}};
+    type();
+  }else{
+    bubble.textContent=text;
+  }
+}
+
+// === AURA COLOR (mood-based) ===
+function updateAura(moods){
+  const aura=document.getElementById('aura');
+  let hue=240;
+  if(moods.includes('urgent')||moods.includes('intense'))hue=0;
+  else if(moods.includes('contemplative')||moods.includes('thoughtful'))hue=240;
+  else if(moods.includes('uncertain')||moods.includes('wrestling'))hue=280;
+  else if(moods.includes('overflowing'))hue=60;
+  else if(moods.includes('guarded'))hue=200;
+  aura.style.background=`hsl(${hue},60%,30%)`;
+  aura.style.opacity='.08';
+}
+
+// === INPUT TRACKING ===
+const inp=document.getElementById('inp');
+inp.addEventListener('keydown',e=>{
+  if(e.key==='f'&&!e.target.value&&e.ctrlKey){document.documentElement.requestFullscreen().catch(()=>{});return;}
+  const now=Date.now();
+  if(!tracker.startTime)tracker.startTime=now;
+  if(e.key==='Backspace'){
+    tracker.backspaces++;
+    if(tracker.currentBurst>0){tracker.burstLengths.push(tracker.currentBurst);tracker.currentBurst=0;}
+  }else if(e.key==='Enter'){
+    const val=inp.value.trim();if(!val)return;
+    msgCount++;
+    // Analyze behavior
+    const analysis=analyzeTyping(val);
+    const moods=detectMood(analysis,val);
+    updateAura(moods);
+    addMsg(val,'user');inp.value='';
+    // Get responses
+    const contentResp=getContentResponse(val);
+    const behaviorInsight=msgCount>1?getBehaviorInsight(moods):null;
+    // Sometimes lead with behavior, sometimes with content
+    const useBehavior=behaviorInsight&&Math.random()<.6;
+    const mainResp=useBehavior?behaviorInsight:contentResp;
+    const insight=useBehavior?null:(behaviorInsight||null);
+    const delay=600+Math.random()*1500;
+    setTimeout(()=>addMsg(mainResp,'cosmos',insight),delay);
+    resetTracker();
+  }else if(e.key.length===1){
+    tracker.totalKeys++;
+    if(tracker.keyTimes.length>0){
+      const gap=now-tracker.keyTimes[tracker.keyTimes.length-1];
+      tracker.pauses.push(gap);
+      if(gap>tracker.longestPause)tracker.longestPause=gap;
+      if(gap<100)tracker.currentBurst++;
+      else{if(tracker.currentBurst>0)tracker.burstLengths.push(tracker.currentBurst);tracker.currentBurst=1;}
+    }
+    tracker.keyTimes.push(now);
+    if(e.key>='A'&&e.key<='Z')tracker.capsCount++;
+    if(/[.!?,;:—]/.test(e.key))tracker.punctuation++;
+    if(e.key==='?')tracker.questionMarks++;
+    if(e.key==='!')tracker.exclamations++;
+  }
+});
 
 // Initial greeting
-setTimeout(()=>addMsg(RESPONSES.greeting[Math.random()*RESPONSES.greeting.length|0],'cosmos'),1500);
-
-document.getElementById('inp').addEventListener('keydown',e=>{
-  if(e.key==='Enter'){const val=e.target.value.trim();if(!val)return;
-    addMsg(val,'user');e.target.value='';
-    // Typing delay
-    const delay=800+Math.random()*2000;
-    setTimeout(()=>addMsg(getResponse(val),'cosmos'),delay);}});
+setTimeout(()=>{
+  addMsg('I see you. Not your words — your hands. The way they hesitate, rush, and correct. Speak, and I will read between your keystrokes.','cosmos');
+},1200);
 
 // Background
-const stars=Array.from({length:100},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
-function anim(){requestAnimationFrame(anim);X.fillStyle='rgba(5,5,8,.05)';X.fillRect(0,0,W,H);
-  for(const s of stars){s.p+=.004;X.globalAlpha=.04+Math.sin(s.p)*.03;X.fillStyle='#fff';
+const stars=Array.from({length:120},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
+function anim(){requestAnimationFrame(anim);X.fillStyle='rgba(5,5,8,.04)';X.fillRect(0,0,W,H);
+  for(const s of stars){s.p+=.003;X.globalAlpha=.04+Math.sin(s.p)*.02;X.fillStyle='#fff';
     X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}X.globalAlpha=1;}
 anim();
 
-addEventListener('keydown',e=>{if(e.key==='f'&&!e.target.closest('input'))document.documentElement.requestFullscreen().catch(()=>{});});
+addEventListener('keydown',e=>{if(e.key==='f'&&!document.activeElement.closest('input'))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
 </body>
 </html>
