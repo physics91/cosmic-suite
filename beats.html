@@ -134,5 +134,6 @@ function anim(){requestAnimationFrame(anim);
   document.getElementById('keys').textContent=state==='play'?'MISSES: '+misses+'/10 · BEST: '+best:'D · F · J · K';}
 anim();
 </script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="beats.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>
 </html>

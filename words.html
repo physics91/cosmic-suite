@@ -120,5 +120,6 @@ function anim(){requestAnimationFrame(anim);
 anim();
 addEventListener('keydown',e=>{if(e.key==='f'&&!e.target.closest('input'))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="words.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>
 </html>

@@ -92,5 +92,6 @@ addEventListener('keydown',e=>{
   if(e.key==='+')symmetry=Math.min(32,symmetry+2);if(e.key==='-')symmetry=Math.max(2,symmetry-2);
   if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="mandala.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>
 </html>

@@ -86,5 +86,6 @@ function anim(){requestAnimationFrame(anim);X.fillStyle='rgba(6,6,16,.05)';X.fil
     X.beginPath();X.arc(s.x%C.width,s.y%C.height,s.s,0,Math.PI*2);X.fill();}X.globalAlpha=1;}
 anim();
 </script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="dice.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>
 </html>

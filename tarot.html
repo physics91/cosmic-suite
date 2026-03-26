@@ -107,5 +107,6 @@ anim();newReading();
 addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
   if(e.key==='n')newReading();});
 </script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="tarot.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>
 </html>

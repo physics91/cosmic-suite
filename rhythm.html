@@ -151,5 +151,6 @@ function anim(){requestAnimationFrame(anim);
   document.getElementById('info').textContent=scaleName.toUpperCase()+' · '+SPEEDS[speedIdx].name.toUpperCase()+' · '+totalNotes+' notes';}
 anim();
 </script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="rhythm.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>
 </html>
