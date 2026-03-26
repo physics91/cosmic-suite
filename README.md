@@ -1,8 +1,8 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-11000+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-32_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-170+-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-12600+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-39_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-185+-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**30 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
+**37 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -21,6 +21,8 @@
 | ❋ | **Living Mandala** | Mandala × Particle Life · breathing geometry |
 | 🌄 | **Sonic Terrain** | Fly over terrain that IS the music |
 | 〰 | **Fourier** | Draw waveforms · hear shapes · see sound |
+| ∞ | **Harmonograph** | Pendulum × Fourier · Victorian science art |
+| ♫ | **Cellular Music** | Automata × Music · rules become melodies |
 
 ### Think
 | | Name | What |
@@ -34,6 +36,11 @@
 | 〰 | **Interference** | 2D wave equation · double slit experiment |
 | ✷ | **Conway** | Game of Life · death afterglow · gosper gun |
 | ∅ | **Topology** | Torus · Möbius · Klein bottle · trefoil knot · 3D wireframe |
+| ∴ | **Reaction** | Gray-Scott reaction-diffusion · Turing patterns |
+| ⌇ | **Pendulum** | Double/triple pendulum · chaos · butterfly effect |
+| ⌘ | **Attractor** | Lorenz · Rössler · Aizawa · strange attractors in 3D |
+| ⬡ | **Neural** | Build neural networks · watch signals propagate |
+| ▦ | **Automata** | Wolfram rules · Rule 30/90/110 · 1D cellular automata |
 
 ### Play
 | | Name | What |
@@ -41,7 +48,7 @@
 | 🚀 | **Orbit Runner** | Orbital survival · FPV cockpit mode |
 | 🧩 | **Puzzle** | Connect stars · graph puzzle · levels |
 | 🧠 | **Memory** | Match star pairs · form constellations |
-| 🏎 | **Racer** | Pseudo-3D racing at light speed |
+| 🏎 | **Racer** | Pseudo-3D racing · relativistic effects at 99% c |
 | 🎧 | **Beats** | Rhythm game · DFJK · combos |
 | 🎵 | **Gravity Beats** | Rhythm in warped spacetime · notes curve |
 
@@ -49,7 +56,7 @@
 | | Name | What |
 |---|------|------|
 | 🧘 | **Breathe** | Guided meditation · mic detects breath · stars born from inhale |
-| 🕐 | **Clock** | Time spiral · moon phase · season · ECG heartbeat |
+| 🕐 | **Clock** | Time spiral · moon phase · Earth pulse ring |
 | 💬 | **Chat** | Universe reads HOW you type, not just what |
 | 🔮 | **Tarot** | 15 cosmic cards · past/present/future |
 | 🎲 | **Dice** | 12-face cosmic oracle · shake to roll |
@@ -78,12 +85,13 @@ index.html           — Digital Cosmos (4679 lines, the flagship)
 
 ## Stats
 
-- **~11,000 lines** of hand-written code
-- **32 HTML files**, each fully self-contained
-- **170+ git commits**
+- **~12,600 lines** of hand-written code
+- **39 HTML files**, each fully self-contained
+- **185+ git commits**
 - **0 external dependencies**
 - **60 FPS** across all experiences
-- **30 unique experiences** across 4 categories
+- **37 unique experiences** across 4 categories
+- **10 cross-experience achievements**
 
 ## Tech
 
