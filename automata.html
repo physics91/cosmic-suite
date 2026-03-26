@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automata</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='15' y='4' width='2' height='2' fill='%23fff' opacity='.5'/><rect x='13' y='6' width='2' height='2' fill='%23fff' opacity='.4'/><rect x='17' y='6' width='2' height='2' fill='%23fff' opacity='.4'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#040408;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #rule-display{position:fixed;top:36px;left:50%;transform:translateX(-50%);color:rgba(255,200,100,.3);font-size:16px;letter-spacing:4px;font-weight:200;z-index:2;pointer-events:none}
+    #rule-name{position:fixed;top:56px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.1);font-size:9px;letter-spacing:2px;z-index:2;pointer-events:none}
+    #rule-bits{position:fixed;top:72px;left:50%;transform:translateX(-50%);display:flex;gap:2px;z-index:2;pointer-events:none}
+    .bit{width:16px;height:10px;border:1px solid rgba(255,255,255,.08);font-size:6px;color:rgba(255,255,255,.15);text-align:center;line-height:10px;font-family:monospace}
+    .bit.on{background:rgba(255,200,100,.15)}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">ELEMENTARY CELLULAR AUTOMATA &middot; WOLFRAM RULES</div>
+<div id="rule-display">RULE 30</div>
+<div id="rule-name"></div>
+<div id="rule-bits"></div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="nextRule()">Next Rule</button>
+<button class="btn" style="bottom:16px;right:100px" onclick="prevRule()">Prev Rule</button>
+<button class="btn" style="bottom:16px;right:175px" onclick="randomRule()">Random</button>
+<button class="btn" style="bottom:16px;right:240px" onclick="cycleInit()">Init: <span id="initName">Single</span></button>
+<button class="btn" style="bottom:16px;right:340px" onclick="cycleColor()">Color: <span id="colName">Fire</span></button>
+<button class="btn" style="bottom:16px;right:430px" onclick="reset()">Reset</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+const CELL=2;
+let cols,totalRows,currentRow,grid,generation;
+
+function resize(){
+  W=C.width=innerWidth;H=C.height=innerHeight;
+  cols=Math.ceil(W/CELL);
+  totalRows=Math.ceil(H/CELL);
+  reset();
+}
+
+// === NOTABLE RULES ===
+const NOTABLE=[
+  {rule:30,name:'Chaos from order \u2014 used for randomness'},
+  {rule:90,name:'Sierpinski triangle \u2014 fractal from XOR'},
+  {rule:110,name:'Turing complete \u2014 can compute anything'},
+  {rule:184,name:'Traffic flow \u2014 models cars on a highway'},
+  {rule:45,name:'Complex \u2014 class IV boundary behavior'},
+  {rule:73,name:'Nested triangles \u2014 recursive beauty'},
+  {rule:150,name:'Additive \u2014 related to Pascal triangle mod 2'},
+  {rule:169,name:'Complementary \u2014 inverted class II'},
+  {rule:54,name:'Complex \u2014 localized structures emerge'},
+  {rule:60,name:'Left-shifted Sierpinski variant'},
+  {rule:22,name:'Fractal growth \u2014 Cantor-set-like'},
+  {rule:126,name:'Symmetric chaos \u2014 balanced complexity'},
+  {rule:182,name:'Majority voting \u2014 democratic cells'},
+  {rule:225,name:'Stable patterns \u2014 class II equilibrium'},
+  {rule:105,name:'XOR variant \u2014 interference-like patterns'},
+];
+let ruleIdx=0,rule=30;
+
+// Init modes
+const INITS=['single','random','center3','alternating'];
+let initIdx=0;
+
+// Colors
+const COLORS=[
+  {name:'Fire',alive:'#ff8844',dead:'#0a0408',glow:'#ffaa44'},
+  {name:'Ice',alive:'#88ccff',dead:'#040810',glow:'#aaddff'},
+  {name:'Green',alive:'#44ff88',dead:'#040a08',glow:'#88ffaa'},
+  {name:'Mono',alive:'#ffffff',dead:'#060606',glow:'#aaaaaa'},
+  {name:'Purple',alive:'#aa66ff',dead:'#080410',glow:'#cc88ff'},
+];
+let colorIdx=0;
+
+function applyRule(left,center,right){
+  const idx=(left<<2)|(center<<1)|right;
+  return(rule>>idx)&1;
+}
+
+function initGrid(){
+  grid=new Uint8Array(cols);
+  const mode=INITS[initIdx];
+  if(mode==='single')grid[Math.floor(cols/2)]=1;
+  else if(mode==='random')for(let i=0;i<cols;i++)grid[i]=Math.random()>.5?1:0;
+  else if(mode==='center3'){grid[Math.floor(cols/2)]=1;grid[Math.floor(cols/2)-1]=1;grid[Math.floor(cols/2)+1]=1;}
+  else if(mode==='alternating')for(let i=0;i<cols;i++)grid[i]=i%2;
+}
+
+function reset(){
+  generation=0;currentRow=0;
+  X.fillStyle=COLORS[colorIdx].dead;X.fillRect(0,0,W,H);
+  initGrid();updateRuleDisplay();
+}
+
+function nextRule(){
+  ruleIdx=(ruleIdx+1)%NOTABLE.length;
+  rule=NOTABLE[ruleIdx].rule;reset();
+}
+function prevRule(){
+  ruleIdx=(ruleIdx+NOTABLE.length-1)%NOTABLE.length;
+  rule=NOTABLE[ruleIdx].rule;reset();
+}
+function randomRule(){
+  rule=Math.floor(Math.random()*256);
+  ruleIdx=NOTABLE.findIndex(n=>n.rule===rule);
+  if(ruleIdx<0)ruleIdx=0;
+  reset();
+}
+function cycleInit(){initIdx=(initIdx+1)%INITS.length;document.getElementById('initName').textContent=INITS[initIdx].charAt(0).toUpperCase()+INITS[initIdx].slice(1);reset();}
+function cycleColor(){colorIdx=(colorIdx+1)%COLORS.length;document.getElementById('colName').textContent=COLORS[colorIdx].name;reset();}
+
+function updateRuleDisplay(){
+  document.getElementById('rule-display').textContent='RULE '+rule;
+  const notable=NOTABLE.find(n=>n.rule===rule);
+  document.getElementById('rule-name').textContent=notable?notable.name:'Rule '+rule;
+  // Show 8-bit pattern
+  const container=document.getElementById('rule-bits');
+  container.replaceChildren();
+  for(let i=7;i>=0;i--){
+    const d=document.createElement('div');
+    d.className='bit'+((rule>>i)&1?' on':'');
+    d.textContent=((rule>>i)&1)?'1':'0';
+    container.appendChild(d);
+  }
+}
+
+resize();addEventListener('resize',resize);
+
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();nextRule();}
+  if(e.key==='ArrowRight')nextRule();
+  if(e.key==='ArrowLeft')prevRule();
+  if(e.key==='r')randomRule();
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+});
+
+// === RENDER ===
+function step(){
+  const scheme=COLORS[colorIdx];
+  // Draw current row
+  for(let x=0;x<cols;x++){
+    if(grid[x]){
+      X.fillStyle=scheme.alive;
+      X.globalAlpha=.8;
+      X.fillRect(x*CELL,currentRow*CELL,CELL,CELL);
+    }
+  }
+  // Compute next row
+  const next=new Uint8Array(cols);
+  for(let x=0;x<cols;x++){
+    const l=grid[(x-1+cols)%cols];
+    const c=grid[x];
+    const r=grid[(x+1)%cols];
+    next[x]=applyRule(l,c,r);
+  }
+  grid=next;
+  currentRow++;generation++;
+  // Wrap — scroll or restart
+  if(currentRow>=totalRows){
+    currentRow=0;
+    X.fillStyle=scheme.dead;X.globalAlpha=1;X.fillRect(0,0,W,H);
+  }
+}
+
+function anim(){
+  requestAnimationFrame(anim);
+  // Multiple steps per frame
+  for(let i=0;i<3;i++)step();
+  X.globalAlpha=1;
+  document.getElementById('stats').textContent=
+    'rule: '+rule+'\ngen: '+generation+'\ncells: '+cols;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="automata.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
