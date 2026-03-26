@@ -420,10 +420,18 @@ function anim(){requestAnimationFrame(anim);t+=.01;
     X.globalAlpha=fade*.08;X.font='8px sans-serif';
     X.fillText('\u2014 Douglas Adams',cx,cy+40);
   }
-  // Mini clock
-  const now=new Date(),pad=n=>(''+n).padStart(2,'0');
+  // Universe age — time since first commit
+  const BIRTH=new Date('2026-03-26T05:51:46+09:00').getTime();
+  const now=new Date();const ageMs=now.getTime()-BIRTH;
+  const ageSec=Math.floor(ageMs/1000);
+  const ageH=Math.floor(ageSec/3600);const ageM=Math.floor(ageSec%3600/60);const ageS=ageSec%60;
+  const pad=n=>(''+n).padStart(2,'0');
+  // Bottom bar
   X.globalAlpha=.06;X.fillStyle='#fff';X.font='10px monospace';X.textAlign='center';
-  X.fillText(pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+' · '+EXP.length+' experiences · 0 dependencies',cx,H-10);
+  X.fillText(pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+' \u00b7 '+EXP.length+' experiences \u00b7 0 dependencies',cx,H-10);
+  // Universe age
+  X.globalAlpha=.04;X.fillStyle='#ffcc88';X.font='8px sans-serif';
+  X.fillText('universe age: '+ageH+'h '+pad(ageM)+'m '+pad(ageS)+'s',cx,H-48);
   X.globalAlpha=1;}
 anim();
 </script>
