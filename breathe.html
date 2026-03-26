@@ -113,6 +113,7 @@ function anim(){requestAnimationFrame(anim);
       // Skip zero-duration phases
       while(pat.times[breathPhase]===0)breathPhase=(breathPhase+1)%4;
       document.getElementById('phase').textContent=PHASES[breathPhase];
+      document.getElementById('phase').style.color=['rgba(100,200,255,.5)','rgba(255,200,100,.4)','rgba(100,255,150,.5)','rgba(255,200,100,.4)'][breathPhase];
       updateSound();}
     const min=totalTime/60|0;const sec=totalTime%60|0;
     document.getElementById('timer').textContent=min+'m '+sec+'s · '+cycles+' breaths · '+lifetimeBreaths+' lifetime';}
