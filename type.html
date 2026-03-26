@@ -21,6 +21,7 @@
 <div id="info">EVERY KEYSTROKE CREATES A STAR</div>
 <input id="text" type="text" placeholder="start typing..." autofocus>
 <div id="stats"></div>
+<button onclick="stars=[];totalKeys=0;totalWords=0;document.getElementById('text').value=''" style="position:fixed;bottom:20px;right:20px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 12px;border-radius:10px;cursor:pointer;font-size:9px;z-index:3">Clear Sky</button>
 <canvas id="c"></canvas>
 <script>
 const C=document.getElementById('c'),X=C.getContext('2d');
