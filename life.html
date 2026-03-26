@@ -106,6 +106,11 @@ function anim(){requestAnimationFrame(anim);_fc++;if(_shuf){_shufT++;if(_shufT>3
   for(const p of particles){const s=SPECIES[p.sp];const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
     X.globalAlpha=.04+spd*.02;X.fillStyle=s.color;X.beginPath();X.arc(p.x,p.y,4+spd*2,0,Math.PI*2);X.fill();
     X.globalAlpha=.6+spd*.2;X.beginPath();X.arc(p.x,p.y,1.5,0,Math.PI*2);X.fill();}
+  // Same-species bonds
+  if(!_paused)for(let i=0;i<particles.length;i+=4){const a=particles[i];
+    for(let j=i+4;j<particles.length;j+=4){const b=particles[j];if(a.sp!==b.sp)continue;
+      const dx=a.x-b.x,dy=a.y-b.y;if(dx*dx+dy*dy<900){X.globalAlpha=.015;X.strokeStyle=SPECIES[a.sp].color;X.lineWidth=.3;
+        X.beginPath();X.moveTo(a.x,a.y);X.lineTo(b.x,b.y);X.stroke();}}}
   X.globalAlpha=1;
   const pop=[0,0,0,0];for(const p of particles)pop[p.sp]++;
   document.getElementById('info').textContent='R:'+pop[0]+' G:'+pop[1]+' B:'+pop[2]+' Y:'+pop[3]+' · '+_fps+' FPS';}
