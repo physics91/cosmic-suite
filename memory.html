@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Memory</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='10' cy='12' r='3' fill='%23ffcc44' opacity='.5'/><circle cx='22' cy='20' r='3' fill='%23ffcc44' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#060610;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:pointer}
+    canvas{display:block}
+    #info{position:fixed;top:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.3);font-size:14px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #score{position:fixed;top:45px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:10px;letter-spacing:2px;z-index:2;pointer-events:none}
+    #controls{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:3}
+    .btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:5px 14px;border-radius:12px;cursor:pointer;font-size:10px;transition:all .2s}
+    .btn:hover{background:rgba(255,255,255,.1);color:#fff}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">FIND THE PAIRS</div>
+<div id="score"></div>
+<div id="controls">
+  <button class="btn" onclick="startGame(4)">Easy (4)</button>
+  <button class="btn" onclick="startGame(6)">Medium (6)</button>
+  <button class="btn" onclick="startGame(8)">Hard (8)</button>
+</div>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+const SYMBOLS=['✦','◆','▲','●','◈','★','♦','◎','✶','♥','⬟','☽'];
+let cards=[],flipped=[],matched=new Set(),moves=0,pairs=0,gridSize=4,locked=false,bestMoves={};
+
+function startGame(size){
+  gridSize=size;const total=size*size;const pairCount=total/2;
+  cards=[];flipped=[];matched.clear();moves=0;pairs=0;locked=false;
+  // Create pairs
+  const syms=SYMBOLS.slice(0,pairCount);const deck=[...syms,...syms];
+  // Shuffle
+  for(let i=deck.length-1;i>0;i--){const j=Math.random()*i|0;[deck[i],deck[j]]=[deck[j],deck[i]];}
+  // Position cards
+  const margin=40;const cw=(W-margin*2)/size,ch=(H-120)/size;
+  for(let i=0;i<total;i++){
+    const col=i%size,row=Math.floor(i/size);
+    cards.push({sym:deck[i],x:margin+col*cw+cw/2,y:80+row*ch+ch/2,w:cw*.8,h:ch*.8,
+      hue:SYMBOLS.indexOf(deck[i])*30,flip:0,matched:false});}
+  // Brief reveal
+  locked=true;cards.forEach(c=>c.flip=1);
+  setTimeout(()=>{cards.forEach(c=>c.flip=0);locked=false;},1500);}
+
+C.addEventListener('click',e=>{
+  if(locked)return;
+  const card=cards.find(c=>!c.matched&&Math.abs(e.clientX-c.x)<c.w/2&&Math.abs(e.clientY-c.y)<c.h/2);
+  if(!card||flipped.includes(card))return;
+  card.flip=1;flipped.push(card);
+  // Sound
+  try{const a=new(AudioContext||webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();
+    o.frequency.value=300+flipped.length*200;o.type='sine';g.gain.setValueAtTime(.03,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.2);o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.2);}catch(e){}
+  if(flipped.length===2){moves++;locked=true;
+    if(flipped[0].sym===flipped[1].sym){// Match!
+      flipped[0].matched=flipped[1].matched=true;pairs++;
+      flipped=[];locked=false;
+      if(pairs===cards.length/2){// Win!
+        const key=''+gridSize;if(!bestMoves[key]||moves<bestMoves[key])bestMoves[key]=moves;
+        document.getElementById('info').textContent='✦ COMPLETE IN '+moves+' MOVES ✦';
+        try{const a=new(AudioContext||webkitAudioContext)();[400,500,600,800].forEach((f,i)=>{const o=a.createOscillator(),g=a.createGain();o.frequency.value=f;o.type='sine';g.gain.setValueAtTime(.02,a.currentTime+i*.15);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+i*.15+.5);o.connect(g);g.connect(a.destination);o.start(a.currentTime+i*.15);o.stop(a.currentTime+i*.15+.5);});}catch(e){}}
+    }else{// No match — flip back
+      setTimeout(()=>{flipped.forEach(c=>c.flip=0);flipped=[];locked=false;},800);}}});
+
+const bg=Array.from({length:60},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
+
+function anim(){requestAnimationFrame(anim);
+  X.fillStyle='rgba(6,6,16,.2)';X.fillRect(0,0,W,H);
+  for(const s of bg){s.p+=.003;X.globalAlpha=.03+Math.sin(s.p)*.02;X.fillStyle='#fff';
+    X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
+  // Draw cards
+  for(const c of cards){
+    if(c.matched){// Matched — show as constellation star
+      X.globalAlpha=.1+Math.sin(Date.now()*.003+c.hue)*.05;X.fillStyle=`hsl(${c.hue},60%,60%)`;
+      X.beginPath();X.arc(c.x,c.y,8,0,Math.PI*2);X.fill();
+      X.globalAlpha=.03;X.beginPath();X.arc(c.x,c.y,20,0,Math.PI*2);X.fill();
+      continue;}
+    // Card background
+    X.globalAlpha=.06;X.fillStyle='#fff';
+    X.fillRect(c.x-c.w/2,c.y-c.h/2,c.w,c.h);
+    X.globalAlpha=.08;X.strokeStyle='#fff';X.lineWidth=.5;
+    X.strokeRect(c.x-c.w/2,c.y-c.h/2,c.w,c.h);
+    if(c.flip){// Show symbol
+      X.globalAlpha=.7;X.fillStyle=`hsl(${c.hue},60%,70%)`;
+      X.font=Math.min(c.w,c.h)*.4+'px sans-serif';X.textAlign='center';X.textBaseline='middle';
+      X.fillText(c.sym,c.x,c.y);
+    }else{// Show star (hidden)
+      X.globalAlpha=.15;X.fillStyle='#fff';X.beginPath();X.arc(c.x,c.y,3,0,Math.PI*2);X.fill();}}
+  // Connection lines between matched pairs
+  const matchedCards=cards.filter(c=>c.matched);
+  for(let i=0;i<matchedCards.length;i+=2){if(i+1>=matchedCards.length)break;
+    X.globalAlpha=.04;X.strokeStyle=`hsl(${matchedCards[i].hue},50%,60%)`;X.lineWidth=.5;
+    X.beginPath();X.moveTo(matchedCards[i].x,matchedCards[i].y);X.lineTo(matchedCards[i+1].x,matchedCards[i+1].y);X.stroke();}
+  X.globalAlpha=1;
+  document.getElementById('score').textContent=moves+' moves · '+pairs+' pairs'+(bestMoves[gridSize]?' · best: '+bestMoves[gridSize]:'');}
+
+startGame(4);anim();
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
+</script>
+</body>
+</html>
