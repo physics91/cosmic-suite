@@ -31,7 +31,7 @@
 <body>
 <div id="title">THE COSMIC SUITE</div>
 <div id="sub"></div>
-<script>const _h=new Date().getHours();document.getElementById('sub').textContent=_h<6?'the stars await':_h<12?'good morning, creator':_h<18?'the cosmos turns':'welcome to the night sky';</script>
+<script>const _h=new Date().getHours();document.getElementById('sub').textContent=(_h<6?'the stars await':_h<12?'good morning, creator':_h<18?'the cosmos turns':'welcome to the night sky')+' · 21 EXPERIENCES';</script>
 <div id="label"><h2 id="lName"></h2><div class="desc" id="lDesc"></div><div class="tag" id="lTag"></div></div>
 <div id="hint">HOVER TO EXPLORE · CLICK TO ENTER · G=galaxy · 1-9=jump</div>
 <div style="position:fixed;bottom:50px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:3;flex-wrap:wrap;justify-content:center">
@@ -178,7 +178,7 @@ function anim(){requestAnimationFrame(anim);t+=.01;
   // Mini clock
   const now=new Date(),pad=n=>(''+n).padStart(2,'0');
   X.globalAlpha=.06;X.fillStyle='#fff';X.font='10px monospace';X.textAlign='center';
-  X.fillText(pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+' · 9 experiences · ~6000 lines · 0 dependencies',cx,H-10);
+  X.fillText(pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+' · 21 experiences · ~7700 lines · 0 dependencies',cx,H-10);
   X.globalAlpha=1;}
 anim();
 </script>
