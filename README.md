@@ -1,8 +1,8 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-7700+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-23_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-150+-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-7700+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-24_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-150+-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**21 cosmic experiences in pure HTML. No dependencies.**
+**22 cosmic experiences in pure HTML. No dependencies.**
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -31,6 +31,7 @@
 | 🎧 | **Beats** | Rhythm game · DFJK · combos | Play |
 | ❋ | **Living Mandala** | Mandala × Life · breathing geometry | Create |
 | 🎲 | **Dice** | 12-face cosmic oracle · shake to roll | Feel |
+| 🌄 | **Sonic Terrain** | Terrain × Music · landscape becomes melody | Create |
 
 ## Quick Start
 
