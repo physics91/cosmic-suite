@@ -106,10 +106,11 @@ function anim(){requestAnimationFrame(anim);
     eg.addColorStop(0,currentPower<-13?'rgba(255,50,50,.06)':'rgba(100,100,255,.06)');eg.addColorStop(1,'rgba(0,0,0,0)');
     X.globalAlpha=.5;X.fillStyle=eg;X.beginPath();X.arc(cx,cy,r*3,0,Math.PI*2);X.fill();}
   X.globalAlpha=1;
-  // Scale indicator particles
-  const scale=Math.pow(10,currentPower);
-  for(let i=0;i<8;i++){const a=i*Math.PI/4+Date.now()*.0003;const dr=r*1.8+Math.sin(Date.now()*.001+i)*10;
-    X.globalAlpha=.03;X.fillStyle='#fff';X.beginPath();X.arc(cx+Math.cos(a)*dr,cy+Math.sin(a)*dr,1,0,Math.PI*2);X.fill();}
+  // Scale indicator particles — behavior changes by scale
+  const jitter=currentPower<-5?.02:currentPower>15?.0001:.0005;
+  const pSize=currentPower<-5?.5:currentPower>15?2:1;
+  for(let i=0;i<8;i++){const a=i*Math.PI/4+Date.now()*jitter;const dr=r*1.8+Math.sin(Date.now()*.001+i)*10;
+    X.globalAlpha=.03;X.fillStyle='#fff';X.beginPath();X.arc(cx+Math.cos(a)*dr,cy+Math.sin(a)*dr,pSize,0,Math.PI*2);X.fill();}
 
   // Update labels
   document.getElementById('name').textContent=obj[1];
