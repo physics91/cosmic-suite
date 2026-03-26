@@ -123,12 +123,13 @@ function anim(){requestAnimationFrame(anim);t+=.01;
   for(let i=0;i<EXP.length;i++){const exp=EXP[i];
     const r=60+exp.orbit*30;const a=t*.2/exp.orbit+i*Math.PI*2/EXP.length;
     const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;
-    const isHov=i===hovered;const sz=isHov?12:7;
+    const isToday=i===new Date().getDay()%EXP.length;
+    const isHov=i===hovered;const sz=isHov?12:isToday?9:7;
     // Glow
     X.globalAlpha=isHov?.15:.04;X.fillStyle=exp.color;
     X.beginPath();X.arc(px,py,sz*3,0,Math.PI*2);X.fill();
     // Body
-    X.globalAlpha=isHov?.9:.5;X.fillStyle=exp.color;
+    X.globalAlpha=isHov?.9:isToday?.7:.5;X.fillStyle=exp.color;
     X.beginPath();X.arc(px,py,sz,0,Math.PI*2);X.fill();
     // Icon
     X.globalAlpha=isHov?.8:.3;X.font=(isHov?16:11)+'px sans-serif';X.textAlign='center';X.textBaseline='middle';
