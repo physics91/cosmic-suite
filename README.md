@@ -1,10 +1,10 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-15500-black?style=flat-square) ![Files](https://img.shields.io/badge/files-53_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-220-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-15800-black?style=flat-square) ![Files](https://img.shields.io/badge/files-54_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-223-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**52 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
+**54 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
 
-> *15,500 lines. 220 commits. 87 dice rolls. Zero dependencies. From nothing, everything.*
+> *From nothing, everything.*
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -54,6 +54,7 @@
 | ▓ | **Gravity Life** | Conway + gravity · life falls and sediments |
 | </> | **Quine** | A program that displays its own source as a galaxy |
 | ▉ | **Maze** | Procedural DFS maze · BFS solver visualization |
+| ♦ | **Ant** | Langton's Ant · 2 rules create a highway |
 
 ### Play
 | | Name | What |
@@ -100,10 +101,10 @@ index.html           — Digital Cosmos (4679 lines, the flagship)
 
 ## Stats
 
-- **15,500 lines** of hand-written code
-- **53 HTML files**, each fully self-contained
-- **220 git commits** in ~24 hours
-- **87 iterations** guided by dice rolls
+- **15,800 lines** of hand-written code
+- **54 HTML files**, each fully self-contained
+- **223 git commits** in ~36 hours
+- **90 iterations** guided by dice rolls
 - **0 external dependencies**
 - **60 FPS** across all experiences
 - **50 unique experiences** across 4 categories
@@ -133,6 +134,8 @@ Each iteration ended with "the universe learned..." — here are some favorites:
 - *z² + c — two characters contain infinity*
 - *A program that observes itself is the beginning of consciousness*
 - *Every maze has exactly one path — just keep walking*
+- *Wait long enough and chaos builds a highway — patience is emergence*
+- *Even a 404 error can be an adventure*
 
 ## License
 
