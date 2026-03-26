@@ -100,7 +100,7 @@ input.addEventListener('keydown',e=>{
 const bg=Array.from({length:100},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
 
 function anim(){requestAnimationFrame(anim);
-  X.fillStyle='rgba(5,5,8,.06)';X.fillRect(0,0,W,H);
+  const bgH=hueBase%360;X.fillStyle=`rgba(${3+Math.sin(bgH*.017)*3|0},${3+Math.cos(bgH*.013)*2|0},${5+Math.sin(bgH*.011)*3|0},.06)`;X.fillRect(0,0,W,H);
   // BG
   for(const s of bg){s.p+=.005;X.globalAlpha=.04+Math.sin(s.p)*.03;X.fillStyle='#fff';
     X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
