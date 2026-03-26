@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Swarm Paint</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><polygon points='16,10 14,14 18,14' fill='%23ff8844' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#080808;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:none}
+    canvas{display:block;position:absolute;top:0;left:0}
+    #paint{z-index:1}#ui{z-index:2;pointer-events:none}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.1);font-size:9px;letter-spacing:3px;z-index:3;pointer-events:none}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="paint"></canvas>
+<canvas id="ui"></canvas>
+<div id="info">MOVE MOUSE TO GUIDE THE SWARM &middot; THEY PAINT FOR YOU</div>
+<button class="btn" style="bottom:16px;right:16px" onclick="clearCanvas()">Clear</button>
+<button class="btn" style="bottom:16px;right:70px" onclick="cycleColor()">Color: <span id="colV">Ember</span></button>
+<button class="btn" style="bottom:16px;right:180px" onclick="addSwarm(30)">+30 Boids</button>
+<button class="btn" style="bottom:16px;right:270px" onclick="exportPNG()">Save</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="portal.html" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>document.getElementById('random-jump').onclick=function(){const e=['about.html','ant.html','art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chaos-map.html','chat.html','clock.html','conway.html','dice.html','drip.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-life.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','maze.html','memory.html','music.html','neural.html','oracle.html','orbit.html','orbits.html','order.html','pendulum.html','pi.html','puzzle.html','quine.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','spirograph.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false;};</script>
+<script>
+const pC=document.getElementById('paint'),pX=pC.getContext('2d');
+const uC=document.getElementById('ui'),uX=uC.getContext('2d');
+let W,H;function resize(){W=pC.width=uC.width=innerWidth;H=pC.height=uC.height=innerHeight;pX.fillStyle='#080808';pX.fillRect(0,0,W,H);}
+resize();addEventListener('resize',resize);
+
+const PALETTES=[
+  {name:'Ember',fn:i=>'hsla('+(20+i%30)+',80%,'+(40+Math.random()*20)+'%,'},
+  {name:'Aurora',fn:i=>'hsla('+(120+i%60)+',60%,'+(40+Math.random()*15)+'%,'},
+  {name:'Void',fn:i=>'hsla('+(240+i%30)+',40%,'+(30+Math.random()*20)+'%,'},
+  {name:'Spectrum',fn:i=>'hsla('+(i*3%360)+',65%,50%,'},
+  {name:'Bone',fn:i=>'hsla(30,10%,'+(60+Math.random()*30)+'%,'},
+];
+let palIdx=0;
+
+const boids=[];
+let mx=W/2,my=H/2;
+
+class Boid{
+  constructor(){this.x=W/2+(Math.random()-.5)*100;this.y=H/2+(Math.random()-.5)*100;
+    this.vx=(Math.random()-.5)*3;this.vy=(Math.random()-.5)*3;this.id=boids.length;}
+}
+
+function addSwarm(n){for(let i=0;i<n;i++)boids.push(new Boid());}
+addSwarm(60);
+
+addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+addEventListener('touchstart',e=>{mx=e.touches[0].clientX;my=e.touches[0].clientY;},{passive:true});
+addEventListener('touchmove',e=>{mx=e.touches[0].clientX;my=e.touches[0].clientY;},{passive:true});
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});if(e.key==='c')clearCanvas();});
+
+function cycleColor(){palIdx=(palIdx+1)%PALETTES.length;document.getElementById('colV').textContent=PALETTES[palIdx].name;}
+function clearCanvas(){pX.fillStyle='#080808';pX.fillRect(0,0,W,H);}
+function exportPNG(){const l=document.createElement('a');l.download='swarm_paint_'+Date.now()+'.png';l.href=pC.toDataURL();l.click();}
+
+const SEP=20,ALI=50,COH=50,MAX_SPD=4,MAX_F=.15;
+
+function anim(){requestAnimationFrame(anim);
+  const colorFn=PALETTES[palIdx].fn;
+
+  for(const b of boids){
+    let sepX=0,sepY=0,sepN=0,aliX=0,aliY=0,aliN=0,cohX=0,cohY=0,cohN=0;
+    for(const o of boids){
+      if(o===b)continue;
+      const dx=o.x-b.x,dy=o.y-b.y,d=Math.sqrt(dx*dx+dy*dy);
+      if(d>60)continue;
+      if(d<SEP&&d>0){sepX-=dx/d;sepY-=dy/d;sepN++;}
+      aliX+=o.vx;aliY+=o.vy;aliN++;
+      cohX+=o.x;cohY+=o.y;cohN++;
+    }
+    let fx=0,fy=0;
+    if(sepN){fx+=sepX/sepN*1.5;fy+=sepY/sepN*1.5;}
+    if(aliN){fx+=(aliX/aliN-b.vx)*.05;fy+=(aliY/aliN-b.vy)*.05;}
+    if(cohN){fx+=(cohX/cohN-b.x)*.003;fy+=(cohY/cohN-b.y)*.003;}
+    // Follow mouse
+    const mdx=mx-b.x,mdy=my-b.y,md=Math.sqrt(mdx*mdx+mdy*mdy);
+    if(md>10){fx+=mdx/md*.06;fy+=mdy/md*.06;}
+
+    const fm=Math.sqrt(fx*fx+fy*fy);
+    if(fm>MAX_F){fx=fx/fm*MAX_F;fy=fy/fm*MAX_F;}
+    b.vx+=fx;b.vy+=fy;
+    const spd=Math.sqrt(b.vx*b.vx+b.vy*b.vy);
+    if(spd>MAX_SPD){b.vx=b.vx/spd*MAX_SPD;b.vy=b.vy/spd*MAX_SPD;}
+
+    const prevX=b.x,prevY=b.y;
+    b.x+=b.vx;b.y+=b.vy;
+    if(b.x<0)b.x=W;if(b.x>W)b.x=0;if(b.y<0)b.y=H;if(b.y>H)b.y=0;
+
+    // Paint trail on paint canvas
+    const alpha=.08+spd*.03;
+    pX.strokeStyle=colorFn(b.id)+alpha+')';
+    pX.lineWidth=.5+spd*.2;
+    pX.beginPath();pX.moveTo(prevX,prevY);pX.lineTo(b.x,b.y);pX.stroke();
+  }
+
+  // UI layer — show boids
+  uX.clearRect(0,0,W,H);
+  for(const b of boids){
+    const angle=Math.atan2(b.vy,b.vx);
+    uX.globalAlpha=.3;uX.fillStyle='#fff';
+    uX.save();uX.translate(b.x,b.y);uX.rotate(angle);
+    uX.beginPath();uX.moveTo(3,0);uX.lineTo(-2,-1.5);uX.lineTo(-2,1.5);uX.closePath();uX.fill();
+    uX.restore();
+  }
+  // Mouse cursor
+  uX.globalAlpha=.08;uX.fillStyle='#fff';
+  uX.beginPath();uX.arc(mx,my,6,0,Math.PI*2);uX.fill();
+  uX.globalAlpha=1;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="swarm-paint.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
