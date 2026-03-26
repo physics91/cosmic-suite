@@ -1,8 +1,10 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-13000+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-41_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-190+-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-13500+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-43_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-195+-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**40 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
+**42 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
+
+> *42: The Answer to Life, the Universe, and Everything.*
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -42,6 +44,8 @@
 | ⬡ | **Neural** | Build neural networks · watch signals propagate |
 | ▦ | **Automata** | Wolfram rules · Rule 30/90/110 · 1D cellular automata |
 | ♧ | **Flocking** | Boids · 3 rules create flocking · predators · species |
+| ❁ | **Swarm Gravity** | Flocking × Gravity · boids fight black holes |
+| ✸ | **Fractal** | Mandelbrot · Julia set · infinite zoom · 6 palettes |
 
 ### Play
 | | Name | What |
@@ -87,14 +91,15 @@ index.html           — Digital Cosmos (4679 lines, the flagship)
 
 ## Stats
 
-- **~13,000 lines** of hand-written code
-- **41 HTML files**, each fully self-contained
-- **190+ git commits**
+- **~13,500 lines** of hand-written code
+- **43 HTML files**, each fully self-contained
+- **195+ git commits**
 - **0 external dependencies**
 - **60 FPS** across all experiences
-- **40 unique experiences** across 4 categories
+- **42 unique experiences** across 4 categories
 - **10 cross-experience achievements**
 - **Random navigation** between all experiences
+- **1 easter egg** (hint: 42)
 
 ## Tech
 

@@ -277,6 +277,16 @@ addEventListener('keydown',e=>{
   if(e.key==='g')viewMode=viewMode==='orbit'?'galaxy':'orbit';
   if(e.key==='/'){e.preventDefault();searchVisible=!searchVisible;searchEl.style.display=searchVisible?'block':'none';if(searchVisible)searchEl.focus();else{searchEl.value='';searchQuery='';}}
 });
+// === 42 EASTER EGG ===
+let keyBuffer='';
+addEventListener('keypress',e=>{
+  if(e.target===searchEl)return;
+  keyBuffer+=e.key;if(keyBuffer.length>5)keyBuffer=keyBuffer.slice(-5);
+  if(keyBuffer.includes('42')){
+    keyBuffer='';easterEgg42=180; // 3 seconds
+  }
+});
+let easterEgg42=0;
 function anim(){requestAnimationFrame(anim);t+=.01;
   X.fillStyle='rgba(5,5,8,.12)';X.fillRect(0,0,W,H);
   const cx=W/2,cy=H/2;
@@ -394,6 +404,17 @@ function anim(){requestAnimationFrame(anim);t+=.01;
     X.fillText('\u2605 '+achNotification.name,cx,80);
     X.globalAlpha=fade*.2;X.font='9px sans-serif';X.fillStyle='#fff';
     X.fillText(achNotification.desc,cx,96);
+  }
+  // 42 Easter Egg
+  if(easterEgg42>0){
+    easterEgg42--;
+    const fade=easterEgg42<30?easterEgg42/30:easterEgg42>150?(180-easterEgg42)/30:1;
+    X.globalAlpha=fade*.3;X.fillStyle='#ffcc44';X.font='20px sans-serif';X.textAlign='center';
+    X.fillText('42',cx,cy);
+    X.globalAlpha=fade*.15;X.font='10px sans-serif';X.fillStyle='#fff';
+    X.fillText('The Answer to Life, the Universe, and Everything',cx,cy+25);
+    X.globalAlpha=fade*.08;X.font='8px sans-serif';
+    X.fillText('\u2014 Douglas Adams',cx,cy+40);
   }
   // Mini clock
   const now=new Date(),pad=n=>(''+n).padStart(2,'0');
