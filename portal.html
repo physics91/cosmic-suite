@@ -129,6 +129,10 @@ function anim(){requestAnimationFrame(anim);t+=.01;
     // Label — always show (dimmer when not hovered)
     X.globalAlpha=isHov?.5:.12;X.font=(isHov?'10':'7')+'px sans-serif';X.fillStyle='#fff';
     X.fillText(exp.name,px,py+sz+12);}
+  // Mini clock
+  const now=new Date(),pad=n=>(''+n).padStart(2,'0');
+  X.globalAlpha=.06;X.fillStyle='#fff';X.font='10px monospace';X.textAlign='center';
+  X.fillText(pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds()),cx,H-10);
   X.globalAlpha=1;}
 anim();
 </script>
