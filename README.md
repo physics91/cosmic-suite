@@ -1,8 +1,10 @@
 # The Cosmic Suite
 
+![Lines](https://img.shields.io/badge/lines-5900+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-10_HTML-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square) ![FPS](https://img.shields.io/badge/FPS-60-black?style=flat-square)
+
 **9 cosmic experiences in pure HTML. No dependencies.**
 
-Open `portal.html` to begin.
+**[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
 ---
 
