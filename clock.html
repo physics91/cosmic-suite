@@ -38,6 +38,15 @@ function anim(){requestAnimationFrame(anim);
   for(const st of stars){st.p+=.003;X.globalAlpha=.06+Math.sin(st.p)*.04;X.fillStyle='#fff';
     X.beginPath();X.arc(st.x%W,st.y%H,st.s,0,Math.PI*2);X.fill();}
 
+  // Time Spiral — past hours spiral inward
+  for(let t=0;t<720;t++){// 720 minutes = 12 hours
+    const pastMin=(h*60+m-t+720)%720;
+    const spiralAngle=(pastMin/720)*Math.PI*12-Math.PI/2;// 6 full rotations
+    const spiralR=R*.3+t/720*R*.6;
+    const hue=(pastMin/720)*360;
+    X.globalAlpha=.008*(1-t/720);X.fillStyle=`hsl(${hue},40%,50%)`;
+    X.beginPath();X.arc(cx+Math.cos(spiralAngle)*spiralR,cy+Math.sin(spiralAngle)*spiralR,.5+t/720,0,Math.PI*2);X.fill();}
+
   // Hour markers — 12 constellation dots
   for(let i=0;i<12;i++){
     const a=i*Math.PI/6-Math.PI/2;const big=i%3===0;
