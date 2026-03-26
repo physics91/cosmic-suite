@@ -136,7 +136,9 @@ C.addEventListener('contextmenu',e=>{e.preventDefault();
   if(best>=0)stars.splice(best,1);});
 
 $('bpmSlider').oninput=function(){bpm=+this.value;$('bpmVal').textContent=bpm;};
-addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();togglePlay();}if(e.key==='r')randomize();if(e.key==='c')clearStars();if(e.key==='t')tapTempo();});
+addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();togglePlay();}if(e.key==='r')randomize();if(e.key==='c')clearStars();if(e.key==='t')tapTempo();
+  if(e.key==='s'){// Snap stars to nearest grid column
+    for(const s of stars){const col=s.getNoteInfo().col;s.x=col*W/16+W/32;}}});
 function $(id){return document.getElementById(id);}
 
 function togglePlay(){playing=!playing;$('btnPlay').classList.toggle('active',playing);$('btnPlay').textContent=playing?'Pause':'Play';}
