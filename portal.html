@@ -33,9 +33,14 @@
 <div id="sub"></div>
 <script>const _h=new Date().getHours();document.getElementById('sub').textContent=_h<6?'the stars await':_h<12?'good morning, creator':_h<18?'the cosmos turns':'welcome to the night sky';</script>
 <div id="label"><h2 id="lName"></h2><div class="desc" id="lDesc"></div><div class="tag" id="lTag"></div></div>
-<div id="hint">HOVER TO EXPLORE · CLICK TO ENTER</div>
-<div style="position:fixed;bottom:50px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:3">
-  <button onclick="location.href=EXP[Math.random()*EXP.length|0].href" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:5px 14px;border-radius:12px;cursor:pointer;font-size:10px;letter-spacing:1px">Random</button>
+<div id="hint">HOVER TO EXPLORE · CLICK TO ENTER · G=galaxy · 1-9=jump</div>
+<div style="position:fixed;bottom:50px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:3;flex-wrap:wrap;justify-content:center">
+  <button onclick="filterCat='all'" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:4px 10px;border-radius:10px;cursor:pointer;font-size:9px">All</button>
+  <button onclick="filterCat='create'" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:4px 10px;border-radius:10px;cursor:pointer;font-size:9px">Create</button>
+  <button onclick="filterCat='play'" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:4px 10px;border-radius:10px;cursor:pointer;font-size:9px">Play</button>
+  <button onclick="filterCat='feel'" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:4px 10px;border-radius:10px;cursor:pointer;font-size:9px">Feel</button>
+  <button onclick="filterCat='think'" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:4px 10px;border-radius:10px;cursor:pointer;font-size:9px">Think</button>
+  <button onclick="location.href=EXP[Math.random()*EXP.length|0].href" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:4px 10px;border-radius:10px;cursor:pointer;font-size:9px">Random</button>
   <button onclick="document.documentElement.requestFullscreen().catch(()=>{})"
     style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:5px 14px;border-radius:12px;cursor:pointer;font-size:10px;letter-spacing:1px">Fullscreen</button>
   <button onclick="location.href=EXP[new Date().getDay()%EXP.length].href" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:5px 14px;border-radius:12px;cursor:pointer;font-size:10px;letter-spacing:1px">Today's Pick</button>
@@ -47,27 +52,27 @@ let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
 const EXP=[
-  {name:'COSMOS',desc:'Universe simulator · 4672 lines · 84 achievements',tag:'explore',href:'index.html',color:'#6688ff',icon:'🌌',orbit:1},
-  {name:'MUSIC BOX',desc:'Visual sequencer · stars become notes · 5 scales',tag:'listen',href:'music.html',color:'#ffcc44',icon:'🎵',orbit:2},
-  {name:'GRAVITY CANVAS',desc:'Draw with gravity · 5 palettes · symmetry mode',tag:'create',href:'art.html',color:'#ff6644',icon:'🎨',orbit:3},
-  {name:'BREATHE',desc:'Guided meditation · 4 patterns · binaural beats',tag:'feel',href:'breathe.html',color:'#44ddaa',icon:'🧘',orbit:4},
-  {name:'PARTICLE LIFE',desc:'Emergent life · 4 species · editable rules',tag:'think',href:'life.html',color:'#ff4488',icon:'🧬',orbit:5},
-  {name:'COSMIC CLOCK',desc:'Time as orbiting light · tick sound · greetings',tag:'watch',href:'clock.html',color:'#aabbcc',icon:'🕐',orbit:6},
-  {name:'ORBIT RUNNER',desc:'One-button survival · collect orbs · level up',tag:'play',href:'orbit.html',color:'#44aaff',icon:'🚀',orbit:7},
-  {name:'COSMIC SCALE',desc:'40 orders of magnitude · quarks to universe',tag:'learn',href:'scale.html',color:'#aa77ff',icon:'🔬',orbit:8},
-  {name:'COSMIC TYPE',desc:'Keystrokes become stars · words = constellations',tag:'write',href:'type.html',color:'#ff88aa',icon:'✍',orbit:9},
-  {name:'TERRAIN',desc:'Procedural planets · fly over mountains and oceans',tag:'fly',href:'terrain.html',color:'#88aa44',icon:'🏔',orbit:10},
-  {name:'COSMIC CHAT',desc:'Talk to the universe · it talks back',tag:'converse',href:'chat.html',color:'#88ddff',icon:'💬',orbit:11},
-  {name:'RHYTHM',desc:'Breathe + Music hybrid · your breath composes',tag:'sync',href:'rhythm.html',color:'#ff88aa',icon:'💫',orbit:12},
-  {name:'PUZZLE',desc:'Connect stars into constellations · no crossing lines',tag:'solve',href:'puzzle.html',color:'#ffcc44',icon:'🧩',orbit:13},
-  {name:'LIVING WORDS',desc:'Words become creatures · they attract, repel, connect',tag:'speak',href:'words.html',color:'#ff88cc',icon:'💬',orbit:14},
-  {name:'MEMORY',desc:'Find star pairs · matched stars form constellations',tag:'remember',href:'memory.html',color:'#ffcc44',icon:'🧠',orbit:15},
-  {name:'MANDALA',desc:'Draw with perfect symmetry · sacred geometry',tag:'draw',href:'mandala.html',color:'#cc88ff',icon:'🔮',orbit:16},
-  {name:'RACER',desc:'Terrain × Orbit hybrid · dodge obstacles at light speed',tag:'race',href:'racer.html',color:'#44aaff',icon:'🏎',orbit:17},
-  {name:'TAROT',desc:'The cosmos reads your fortune · past present future',tag:'divine',href:'tarot.html',color:'#ffcc44',icon:'🔮',orbit:18},
+  {name:'COSMOS',desc:'Universe simulator · 4672 lines · 84 achievements',tag:'explore',href:'index.html',color:'#6688ff',icon:'🌌',orbit:1,cat:'think'},
+  {name:'MUSIC BOX',desc:'Visual sequencer · stars become notes · mic input',tag:'listen',href:'music.html',color:'#ffcc44',icon:'🎵',orbit:2,cat:'create'},
+  {name:'GRAVITY CANVAS',desc:'Draw with gravity · force fields · symmetry',tag:'create',href:'art.html',color:'#ff6644',icon:'🎨',orbit:3,cat:'create'},
+  {name:'BREATHE',desc:'Guided meditation · 4 patterns · binaural beats',tag:'feel',href:'breathe.html',color:'#44ddaa',icon:'🧘',orbit:4,cat:'feel'},
+  {name:'PARTICLE LIFE',desc:'Emergent life · 4 species · 3D mode',tag:'think',href:'life.html',color:'#ff4488',icon:'🧬',orbit:5,cat:'think'},
+  {name:'COSMIC CLOCK',desc:'Time spiral · moon phase · season · day arc',tag:'watch',href:'clock.html',color:'#aabbcc',icon:'🕐',orbit:6,cat:'feel'},
+  {name:'ORBIT RUNNER',desc:'Survive in orbit · combos · trajectory preview',tag:'play',href:'orbit.html',color:'#44aaff',icon:'🚀',orbit:7,cat:'play'},
+  {name:'COSMIC SCALE',desc:'40 orders of magnitude · map view · auto-scroll',tag:'learn',href:'scale.html',color:'#aa77ff',icon:'🔬',orbit:8,cat:'think'},
+  {name:'COSMIC TYPE',desc:'Keystrokes = stars · WPM · color themes',tag:'write',href:'type.html',color:'#ff88aa',icon:'✍',orbit:9,cat:'create'},
+  {name:'TERRAIN',desc:'5 planet types · fly over procedural worlds',tag:'fly',href:'terrain.html',color:'#88aa44',icon:'🏔',orbit:10,cat:'think'},
+  {name:'COSMIC CHAT',desc:'Talk to the universe · it talks back',tag:'converse',href:'chat.html',color:'#88ddff',icon:'💬',orbit:11,cat:'feel'},
+  {name:'RHYTHM',desc:'Breathe + Music · your breath composes',tag:'sync',href:'rhythm.html',color:'#ff88aa',icon:'💫',orbit:12,cat:'create'},
+  {name:'PUZZLE',desc:'Connect stars · graph puzzle · levels',tag:'solve',href:'puzzle.html',color:'#ffcc44',icon:'🧩',orbit:13,cat:'play'},
+  {name:'LIVING WORDS',desc:'Words become creatures · ecosystems of language',tag:'speak',href:'words.html',color:'#ff88cc',icon:'💬',orbit:14,cat:'think'},
+  {name:'MEMORY',desc:'Find star pairs · form constellations',tag:'remember',href:'memory.html',color:'#ffcc44',icon:'🧠',orbit:15,cat:'play'},
+  {name:'MANDALA',desc:'Sacred geometry · n-fold symmetry drawing',tag:'draw',href:'mandala.html',color:'#cc88ff',icon:'🔮',orbit:16,cat:'create'},
+  {name:'RACER',desc:'Pseudo-3D racing · dodge at light speed',tag:'race',href:'racer.html',color:'#44aaff',icon:'🏎',orbit:17,cat:'play'},
+  {name:'TAROT',desc:'The cosmos reads your fortune',tag:'divine',href:'tarot.html',color:'#ffcc44',icon:'🔮',orbit:18,cat:'feel'},
 ];
 
-let hovered=-1,t=0,mTrail=[],viewMode='orbit';// orbit or galaxy
+let hovered=-1,t=0,mTrail=[],viewMode='orbit',filterCat='all';// orbit or galaxy
 const bgStars=Array.from({length:200},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random()*1.5,p:Math.random()*Math.PI*2}));
 
 function getPlanetPos(i){const cx=W/2,cy=H/2,exp=EXP[i];
@@ -140,6 +145,8 @@ function anim(){requestAnimationFrame(anim);t+=.01;
       px=cx+gx+Math.sin(t*.3+i)*5;py=cy+gy+Math.cos(t*.2+i)*5;
     }else{const r=60+exp.orbit*30;const a=t*.2/exp.orbit+i*Math.PI*2/EXP.length;
       px=cx+Math.cos(a)*r;py=cy+Math.sin(a)*r;}
+    const filtered=filterCat!=='all'&&exp.cat!==filterCat;
+    if(filtered){X.globalAlpha=.02;X.fillStyle=exp.color;X.beginPath();X.arc(px,py,3,0,Math.PI*2);X.fill();continue;}
     const isToday=i===new Date().getDay()%EXP.length;
     const isHov=i===hovered;const sz=isHov?12:isToday?9:7;
     // Glow
