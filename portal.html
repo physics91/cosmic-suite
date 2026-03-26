@@ -144,7 +144,7 @@ function anim(){requestAnimationFrame(anim);t+=.01;
   // Mini clock
   const now=new Date(),pad=n=>(''+n).padStart(2,'0');
   X.globalAlpha=.06;X.fillStyle='#fff';X.font='10px monospace';X.textAlign='center';
-  X.fillText(pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds()),cx,H-10);
+  X.fillText(pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+' · 9 experiences · ~6000 lines · 0 dependencies',cx,H-10);
   X.globalAlpha=1;}
 anim();
 </script>
