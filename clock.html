@@ -95,9 +95,11 @@ function anim(){requestAnimationFrame(anim);
   const pad=n=>n.toString().padStart(2,'0');
   document.getElementById('time').textContent=pad(h)+':'+pad(m)+':'+pad(s);
   const days=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  if(tick&&s!==lastSec){lastSec=s;try{const a=new(AudioContext||webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=s%2?800:600;o.type='sine';g.gain.setValueAtTime(.008,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.05);o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.05);}catch(e){}}
   const greet=h<6?'the stars are yours':h<12?'good morning, stargazer':h<18?'the cosmos turns':' the night welcomes you';
   document.getElementById('date').textContent=days[now.getDay()]+' '+now.getFullYear()+'.'+pad(now.getMonth()+1)+'.'+pad(now.getDate())+' · '+greet;}
-let minimal=false;
+let minimal=false,tick=false,lastSec=-1;
+addEventListener('dblclick',()=>{tick=!tick;});
 addEventListener('click',()=>{minimal=!minimal;
   document.getElementById('time').style.fontSize=minimal?'min(15vw,80px)':'14px';
   document.getElementById('time').style.opacity=minimal?'.4':'.1';});
