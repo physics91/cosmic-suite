@@ -29,6 +29,7 @@
   <button class="btn" onclick="preset('swarm')">Swarm</button>
   <button class="btn" onclick="reset()">Reset</button>
   <button class="btn" id="shBtn" onclick="toggleShuffle()">Auto Shuffle</button>
+  <button class="btn" onclick="const l=document.createElement('a');l.download='life_'+Date.now()+'.png';l.href=C.toDataURL();l.click()">Save PNG</button>
 </div>
 <canvas id="c"></canvas>
 <script>
