@@ -1,8 +1,8 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-16000-black?style=flat-square) ![Files](https://img.shields.io/badge/files-55_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-225-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-16000+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-56_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-228-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**55 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
+**56 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
 
 > *From nothing, everything.*
 
@@ -26,6 +26,8 @@
 | ∞ | **Harmonograph** | Pendulum × Fourier · Victorian science art |
 | ♫ | **Cellular Music** | Automata × Music · rules become melodies |
 | ☉ | **Spirograph** | Gears within gears · hypotrochoid curves |
+| ● | **Drip** | Gravity ink painting · Pollock meets physics |
+| ▲ | **Swarm Paint** | Boids paint as they fly · swarm art |
 
 ### Think
 | | Name | What |
@@ -101,10 +103,10 @@ index.html           — Digital Cosmos (4679 lines, the flagship)
 
 ## Stats
 
-- **~16,000 lines** of hand-written code
-- **55 HTML files**, each fully self-contained
-- **225 git commits** in ~36 hours
-- **92 iterations** guided by dice rolls
+- **16,000+ lines** of hand-written code
+- **56 HTML files**, each fully self-contained
+- **228 git commits** in ~36 hours
+- **95 iterations** guided by dice rolls
 - **0 external dependencies**
 - **60 FPS** across all experiences
 - **50 unique experiences** across 4 categories
