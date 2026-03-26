@@ -72,6 +72,8 @@ function renderMatrix(){
   el.appendChild(tbl);}
 renderMatrix();
 
+let _paused=false;
+addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();_paused=!_paused;}});
 C.addEventListener('click',e=>{if(e.target===C)for(let i=0;i<20;i++){
   particles.push({x:e.clientX+(Math.random()-.5)*30,y:e.clientY+(Math.random()-.5)*30,vx:(Math.random()-.5)*3,vy:(Math.random()-.5)*3,sp:Math.random()*N|0});}});
 const RADIUS=80,FRICTION=.5,FORCE=.5;
@@ -93,7 +95,7 @@ function toggleShuffle(){_shuf=!_shuf;document.getElementById('shBtn').textConte
 
 function anim(){requestAnimationFrame(anim);_fc++;if(_shuf){_shufT++;if(_shufT>300){_shufT=0;randomize();}}_ft+=16;if(_ft>=1000){_fps=_fc;_fc=0;_ft=0;}
   const spd=+(document.getElementById('spd')?.value||1);document.getElementById('spdV').textContent=spd+'x';
-  X.fillStyle='rgba(8,8,16,.15)';X.fillRect(0,0,W,H);for(let i=0;i<spd;i++)update();
+  X.fillStyle='rgba(8,8,16,.15)';X.fillRect(0,0,W,H);if(!_paused)for(let i=0;i<spd;i++)update();
   for(const p of particles){const s=SPECIES[p.sp];const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
     X.globalAlpha=.04+spd*.02;X.fillStyle=s.color;X.beginPath();X.arc(p.x,p.y,4+spd*2,0,Math.PI*2);X.fill();
     X.globalAlpha=.6+spd*.2;X.beginPath();X.arc(p.x,p.y,1.5,0,Math.PI*2);X.fill();}
