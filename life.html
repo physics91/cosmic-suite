@@ -19,7 +19,7 @@
 </head>
 <body>
 <div id="title">LIFE</div>
-<div id="info">PARTICLES ATTRACT OR REPEL BASED ON COLOR · LIFE EMERGES FROM SIMPLE RULES</div>
+<div id="info">PARTICLES EAT · SPLIT · DIE · LIFE EMERGES FROM SIMPLE RULES</div>
 <div id="matrix"></div>
 <div style="position:fixed;top:50px;right:16px;z-index:10;color:rgba(255,255,255,.3);font-size:9px;display:flex;align-items:center;gap:4px">speed <input type="range" id="spd" min="1" max="5" value="1" style="width:50px;accent-color:#ff4488"><span id="spdV">1x</span></div>
 <div id="ui">
@@ -44,9 +44,15 @@ const SPECIES=[
 const N=SPECIES.length;
 let rules=Array.from({length:N},()=>Array.from({length:N},()=>+((Math.random()-.5)*2).toFixed(1)));
 
-let particles=[];const COUNT=400;
-function createParticles(){particles=[];
-  for(let i=0;i<COUNT;i++)particles.push({x:Math.random()*W,y:Math.random()*H,z:(Math.random()-.5)*300,vx:0,vy:0,vz:0,sp:i%N});}
+let particles=[];const COUNT=300;let generation=0,totalBirths=0,totalDeaths=0;
+function createParticles(){particles=[];generation=0;totalBirths=0;totalDeaths=0;
+  for(let i=0;i<COUNT;i++)particles.push({
+    x:Math.random()*W,y:Math.random()*H,z:(Math.random()-.5)*300,
+    vx:0,vy:0,vz:0,sp:i%N,
+    energy:50+Math.random()*50, // 0-100, dies at 0
+    age:0,gen:0,
+    size:1.5 // grows with energy
+  });}
 createParticles();
 
 function preset(name){
@@ -82,20 +88,62 @@ C.addEventListener('contextmenu',e=>{e.preventDefault();
   for(let i=particles.length-1;i>=0;i--){const dx=particles[i].x-e.clientX,dy=particles[i].y-e.clientY;
     if(dx*dx+dy*dy<400){particles.splice(i,1);break;}}});
 C.addEventListener('click',e=>{if(e.target===C)for(let i=0;i<20;i++){
-  particles.push({x:e.clientX+(Math.random()-.5)*30,y:e.clientY+(Math.random()-.5)*30,vx:(Math.random()-.5)*3,vy:(Math.random()-.5)*3,sp:Math.random()*N|0});}});
+  particles.push({x:e.clientX+(Math.random()-.5)*30,y:e.clientY+(Math.random()-.5)*30,z:0,vx:(Math.random()-.5)*3,vy:(Math.random()-.5)*3,vz:0,sp:Math.random()*N|0,energy:60+Math.random()*30,age:0,gen:0,size:1.5});}});
 const RADIUS=80,FRICTION=.5,FORCE=.5;
+const births=[];
 function update(){
+  births.length=0;
   for(const p of particles){let fx=0,fy=0;
-    for(const q of particles){if(p===q)continue;
+    p.age++;
+    // Metabolism — lose energy over time
+    p.energy-=.08+Math.sqrt(p.vx*p.vx+p.vy*p.vy)*.02;
+    p.size=1+p.energy*.015;
+    for(const q of particles){if(p===q||q.energy<=0)continue;
       let dx=q.x-p.x,dy=q.y-p.y;
       if(dx>W/2)dx-=W;if(dx<-W/2)dx+=W;if(dy>H/2)dy-=H;if(dy<-H/2)dy+=H;
       const d=Math.sqrt(dx*dx+dy*dy);if(d>RADIUS||d<1)continue;
       const rule=rules[p.sp][q.sp];
       const f=d<20?-1/(d*2):rule*(1-d/RADIUS)*FORCE;
-      fx+=(dx/d)*f;fy+=(dy/d)*f;}
+      fx+=(dx/d)*f;fy+=(dy/d)*f;
+      // EATING — strong attraction + close = consume (predator > prey)
+      if(d<8&&rule>.3&&p.sp!==q.sp&&p.energy>q.energy*.5){
+        const meal=Math.min(15,q.energy*.3);
+        p.energy+=meal;q.energy-=meal*2; // inefficient transfer
+      }
+      // Same species close = share energy
+      if(d<15&&p.sp===q.sp){
+        const avg=(p.energy+q.energy)/2;
+        p.energy+=(avg-p.energy)*.01;
+      }
+    }
     p.vx=(p.vx+fx)*FRICTION;p.vy=(p.vy+fy)*FRICTION;
     p.x+=p.vx;p.y+=p.vy;
-    if(p.x<0)p.x+=W;if(p.x>=W)p.x-=W;if(p.y<0)p.y+=H;if(p.y>=H)p.y-=H;}}
+    if(p.x<0)p.x+=W;if(p.x>=W)p.x-=W;if(p.y<0)p.y+=H;if(p.y>=H)p.y-=H;
+    // REPRODUCTION — high energy = split
+    if(p.energy>85&&particles.length<600&&Math.random()<.02){
+      births.push({
+        x:p.x+(Math.random()-.5)*10,y:p.y+(Math.random()-.5)*10,z:p.z||0,
+        vx:p.vx+(Math.random()-.5)*2,vy:p.vy+(Math.random()-.5)*2,vz:0,
+        sp:Math.random()<.05?(p.sp+1)%N:p.sp, // 5% mutation
+        energy:p.energy*.4,age:0,gen:p.gen+1,size:1
+      });
+      p.energy*=.5;generation=Math.max(generation,p.gen+1);totalBirths++;
+    }
+  }
+  // Add births
+  for(const b of births)particles.push(b);
+  // Death — remove zero-energy particles
+  for(let i=particles.length-1;i>=0;i--){
+    if(particles[i].energy<=0){particles.splice(i,1);totalDeaths++;}
+  }
+  // Spontaneous generation if population too low
+  if(particles.length<30){
+    for(let i=0;i<10;i++)particles.push({
+      x:Math.random()*W,y:Math.random()*H,z:0,vx:0,vy:0,vz:0,
+      sp:Math.random()*N|0,energy:60,age:0,gen:0,size:1.5
+    });
+  }
+}
 
 let _fc=0,_ft=0,_fps=0,_shuf=false,_shufT=0;
 function toggleShuffle(){_shuf=!_shuf;document.getElementById('shBtn').textContent=_shuf?'Stop Shuffle':'Auto Shuffle';}
@@ -106,12 +154,21 @@ function anim(){requestAnimationFrame(anim);_fc++;if(_shuf){_shufT++;if(_shufT>3
   rotY+=view3d?.005:0;
   for(const p of particles){const s=SPECIES[p.sp];const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
     let sx=p.x,sy=p.y,sc=1;
-    if(view3d){// 3D projection with rotation
+    if(view3d){
       const cx=p.x-W/2,cz=p.z||0;
       const rx=cx*Math.cos(rotY)-cz*Math.sin(rotY);const rz=cx*Math.sin(rotY)+cz*Math.cos(rotY);
       const perspective=600/(600+rz);sx=W/2+rx*perspective;sy=p.y*perspective+H/2*(1-perspective);sc=perspective;}
-    X.globalAlpha=(.04+spd*.02)*sc;X.fillStyle=s.color;X.beginPath();X.arc(sx,sy,(4+spd*2)*sc,0,Math.PI*2);X.fill();
-    X.globalAlpha=(.6+spd*.2)*sc;X.beginPath();X.arc(sx,sy,1.5*sc,0,Math.PI*2);X.fill();}
+    const eFrac=Math.max(0,p.energy/100);
+    // Glow — bigger when more energy
+    X.globalAlpha=(.02+eFrac*.06)*sc;X.fillStyle=s.color;X.beginPath();X.arc(sx,sy,(3+eFrac*5)*sc,0,Math.PI*2);X.fill();
+    // Body — brighter with energy
+    X.globalAlpha=(.3+eFrac*.5)*sc;X.beginPath();X.arc(sx,sy,p.size*sc,0,Math.PI*2);X.fill();
+    // Dying indicator
+    if(p.energy<15){X.globalAlpha=.1*(1-p.energy/15);X.strokeStyle='#ff0000';X.lineWidth=.5;
+      X.beginPath();X.arc(sx,sy,p.size*2*sc,0,Math.PI*2);X.stroke();}
+    // Just born flash
+    if(p.age<20){X.globalAlpha=.15*(1-p.age/20);X.fillStyle='#fff';
+      X.beginPath();X.arc(sx,sy,(p.size+3)*sc,0,Math.PI*2);X.fill();}}
   // Same-species bonds
   if(!_paused)for(let i=0;i<particles.length;i+=4){const a=particles[i];
     for(let j=i+4;j<particles.length;j+=4){const b=particles[j];if(a.sp!==b.sp)continue;
@@ -119,7 +176,8 @@ function anim(){requestAnimationFrame(anim);_fc++;if(_shuf){_shufT++;if(_shufT>3
         X.beginPath();X.moveTo(a.x,a.y);X.lineTo(b.x,b.y);X.stroke();}}}
   X.globalAlpha=1;
   const pop=[0,0,0,0];for(const p of particles)pop[p.sp]++;
-  document.getElementById('info').textContent='R:'+pop[0]+' G:'+pop[1]+' B:'+pop[2]+' Y:'+pop[3]+' · '+_fps+' FPS'+(view3d?' · 3D':'');}
+  const maxGen=particles.reduce((m,p)=>Math.max(m,p.gen),0);
+  document.getElementById('info').textContent='R:'+pop[0]+' G:'+pop[1]+' B:'+pop[2]+' Y:'+pop[3]+' · pop:'+particles.length+' · gen:'+maxGen+' · births:'+totalBirths+' deaths:'+totalDeaths+(view3d?' · 3D':'');}
 anim();
 addEventListener("keydown",e=>{if(e.key==="f"&&!e.target.closest("input"))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
