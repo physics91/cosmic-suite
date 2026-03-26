@@ -114,18 +114,67 @@ function anim(){requestAnimationFrame(anim);
         X.fillRect(col*W/COLS,screenY,colW,maxY-screenY);
         maxY=screenY;}}}
 
-  // Sun/moon
-  X.globalAlpha=.15;X.fillStyle='#ffeecc';
-  const sunX=W*.8+Math.sin(Date.now()*.0001)*100;
-  X.beginPath();X.arc(sunX,H*.15,20,0,Math.PI*2);X.fill();
-  X.globalAlpha=.03;X.beginPath();X.arc(sunX,H*.15,60,0,Math.PI*2);X.fill();
+  // Day/night cycle — sun moves with real time
+  const dayPhase=(Date.now()*.00005)%(Math.PI*2);
+  const sunHeight=Math.sin(dayPhase);
+  const isNight=sunHeight<-.1;
+  const sunX=W*.5+Math.cos(dayPhase)*W*.4;
+  const sunY=H*.3-sunHeight*H*.25;
+
+  if(!isNight){
+    X.globalAlpha=.1+sunHeight*.1;X.fillStyle='#ffeecc';
+    X.beginPath();X.arc(sunX,sunY,15+sunHeight*10,0,Math.PI*2);X.fill();
+    X.globalAlpha=.03;X.beginPath();X.arc(sunX,sunY,60,0,Math.PI*2);X.fill();
+  }else{
+    // Moon
+    X.globalAlpha=.08;X.fillStyle='#ccddff';
+    X.beginPath();X.arc(W*.3,H*.15,12,0,Math.PI*2);X.fill();
+  }
+
+  // Weather — rain and clouds
+  const weather=Math.sin(camX*.001+camZ*.001); // -1 to 1, >0.3 = rain
+  const raining=weather>.3;
+
+  // Clouds
+  X.globalAlpha=.03+Math.max(0,weather)*.04;
+  for(let i=0;i<6;i++){
+    const cx2=((i*W*.2+camX*.3)%W+W)%W;
+    const cy2=H*.1+Math.sin(i*3.7)*.05*H+Math.sin(Date.now()*.0002+i)*10;
+    const cw=60+Math.sin(i*5.3)*30;
+    X.fillStyle=raining?'rgba(80,80,100,.3)':'rgba(200,200,220,.2)';
+    X.beginPath();X.ellipse(cx2,cy2,cw,15,0,0,Math.PI*2);X.fill();
+  }
+
+  // Rain
+  if(raining){
+    X.strokeStyle='rgba(150,180,220,.1)';X.lineWidth=.5;
+    for(let i=0;i<40;i++){
+      const rx=Math.random()*W;
+      const ry=Math.random()*H*.7;
+      X.globalAlpha=.06+weather*.04;
+      X.beginPath();X.moveTo(rx,ry);X.lineTo(rx-1,ry+8+speed*2);X.stroke();
+    }
+  }
+
+  // Lightning
+  if(raining&&Math.random()<.003){
+    const lx=Math.random()*W;
+    X.globalAlpha=.3;X.strokeStyle='#fff';X.lineWidth=1.5;
+    X.beginPath();X.moveTo(lx,0);
+    let ly=0;
+    for(let s=0;s<6;s++){ly+=H*.1+Math.random()*H*.05;X.lineTo(lx+(Math.random()-.5)*40,ly);}
+    X.stroke();
+    // Flash
+    X.globalAlpha=.05;X.fillStyle='#fff';X.fillRect(0,0,W,H);
+  }
 
   X.globalAlpha=1;
-  // HUD
   const ch=getHeight(camX*.1,camZ*.1);
+  const timeStr=isNight?'night':sunHeight>.5?'noon':'dawn';
+  const weatherStr=raining?'rain':'clear';
   document.getElementById('coords').textContent=
     'x:'+Math.round(camX)+' z:'+Math.round(camZ)+' alt:'+Math.round(camY)+' spd:'+Math.abs(speed).toFixed(1);
-  document.getElementById('biome').textContent=planet.name+' · '+getBiome(ch);}
+  document.getElementById('biome').textContent=planet.name+' \u00b7 '+getBiome(ch)+' \u00b7 '+timeStr+' \u00b7 '+weatherStr;}
 anim();
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="terrain.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
