@@ -106,7 +106,9 @@ function anim(){requestAnimationFrame(anim);
     if(breathTimer>=phaseDur){breathTimer=0;const prev=breathPhase;breathPhase=(breathPhase+1)%4;
       if(prev===2){cycles++;if(cycles===10)document.getElementById('phase').textContent='10 BREATHS · WELL DONE';
         if(cycles===25)document.getElementById('phase').textContent='25 · YOU ARE CALM';
-        if(cycles===50)document.getElementById('phase').textContent='50 · MASTERY';}
+        if(cycles===50)document.getElementById('phase').textContent='50 · MASTERY';
+        const quotes=['Be here now','This moment is enough','Breathe and let be','You are the sky','Stillness speaks'];
+        if(cycles>5&&cycles%5===0)document.getElementById('timer').textContent+='\n'+quotes[(cycles/5|0)%quotes.length];}
       // Skip zero-duration phases
       while(pat.times[breathPhase]===0)breathPhase=(breathPhase+1)%4;
       document.getElementById('phase').textContent=PHASES[breathPhase];
