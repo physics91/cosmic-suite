@@ -1,10 +1,10 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-15000+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-51_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-213-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-15300-black?style=flat-square) ![Files](https://img.shields.io/badge/files-52_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-216-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**50 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
+**52 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
 
-> *From nothing, everything.*
+> *15,300 lines. 216 commits. 83 dice rolls. Zero dependencies. From nothing, everything.*
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -53,6 +53,7 @@
 | ☉ | **Orbits** | Launch planets · Kepler's laws · figure-8 |
 | ▓ | **Gravity Life** | Conway + gravity · life falls and sediments |
 | </> | **Quine** | A program that displays its own source as a galaxy |
+| ▉ | **Maze** | Procedural DFS maze · BFS solver visualization |
 
 ### Play
 | | Name | What |
@@ -99,10 +100,10 @@ index.html           — Digital Cosmos (4679 lines, the flagship)
 
 ## Stats
 
-- **~15,000 lines** of hand-written code
-- **51 HTML files**, each fully self-contained
-- **213 git commits** in 24 hours
-- **80 iterations** guided by dice rolls
+- **15,300 lines** of hand-written code
+- **52 HTML files**, each fully self-contained
+- **216 git commits** in 24 hours
+- **83 iterations** guided by dice rolls
 - **0 external dependencies**
 - **60 FPS** across all experiences
 - **50 unique experiences** across 4 categories
@@ -130,6 +131,8 @@ Each iteration ended with "the universe learned..." — here are some favorites:
 - *To find optimal order, you must first get hot enough*
 - *Every word is a descendant of another word*
 - *z² + c — two characters contain infinity*
+- *A program that observes itself is the beginning of consciousness*
+- *Every maze has exactly one path — just keep walking*
 
 ## License
 
