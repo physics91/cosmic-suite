@@ -97,6 +97,11 @@ function anim(){requestAnimationFrame(anim);t+=.01;
   // BG stars
   for(const s of bgStars){s.p+=.003;X.globalAlpha=.05+Math.sin(s.p)*.03;X.fillStyle='#fff';
     X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
+  // Shooting star
+  if(Math.random()<.005){const sy2=Math.random()*H*.5,sx2=Math.random()*W;
+    X.globalAlpha=.15;X.strokeStyle='#fff';X.lineWidth=1;X.beginPath();
+    X.moveTo(sx2,sy2);X.lineTo(sx2+80,sy2+30);X.stroke();
+    X.globalAlpha=.03;X.lineTo(sx2+120,sy2+45);X.stroke();}
   // Center sun
   X.globalAlpha=.06;const sg=X.createRadialGradient(cx,cy,0,cx,cy,50);
   sg.addColorStop(0,'rgba(255,255,255,.3)');sg.addColorStop(1,'rgba(0,0,0,0)');
