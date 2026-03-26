@@ -102,6 +102,7 @@ function randomWells(){clearWells();const n=3+Math.random()*5|0;
 function exportArt(){const l=document.createElement('a');l.download=`gravity_art_${Date.now()}.png`;l.href=artC.toDataURL('image/png');l.click();}
 
 // Render
+let _af=0,_at=0,_afps=0;
 function anim(){requestAnimationFrame(anim);
   const trail=+(document.getElementById('tLen').value);
   const colors=PALETTES[currentPalette].colors;
@@ -136,7 +137,8 @@ function anim(){requestAnimationFrame(anim);
     g.addColorStop(0,'rgba(255,100,60,.1)');g.addColorStop(1,'rgba(0,0,0,0)');
     uiX.fillStyle=g;uiX.beginPath();uiX.arc(w.x,w.y,w.mass,0,Math.PI*2);uiX.fill();}
   uiX.globalAlpha=1;
-  document.getElementById('info').textContent=wells.length+' WELLS · '+particles.length+' PARTICLES · '+PALETTES[currentPalette].name.toUpperCase();}
+  _af++;_at+=16;if(_at>=1000){_afps=_af;_af=0;_at=0;}
+  document.getElementById('info').textContent=wells.length+' WELLS · '+particles.length+' PARTICLES · '+PALETTES[currentPalette].name.toUpperCase()+' · '+_afps+' FPS';}
 anim();
 </script>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
