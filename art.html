@@ -40,7 +40,8 @@
   <button class="btn" onclick="clearArt()">Clear Canvas</button>
   <button class="btn" onclick="resetParticles()">Reset Particles</button>
   <button class="btn" onclick="clearWells()">Clear Wells</button>
-  <button class="btn" onclick="randomWells()">Random Wells</button>
+  <button class="btn" onclick="randomWells()">Random</button>
+  <button class="btn" onclick="ringWells()">Ring</button>
   <button class="btn" onclick="symm=!symm;this.textContent=symm?'Symm ON':'Symm OFF'">Symm OFF</button>
   <button class="btn" onclick="exportArt()">Export PNG</button>
 </div>
@@ -102,6 +103,8 @@ function resetParticles(){initParticles(+(document.getElementById('pCount').valu
 function clearWells(){wells=[];}
 function randomWells(){clearWells();const n=3+Math.random()*5|0;
   for(let i=0;i<n;i++)wells.push({x:Math.random()*W,y:Math.random()*H,mass:50+Math.random()*200});}
+function ringWells(){clearWells();const n=8;const m=+(document.getElementById('gStr').value);
+  for(let i=0;i<n;i++){const a=i*Math.PI*2/n;wells.push({x:W/2+Math.cos(a)*200,y:H/2+Math.sin(a)*200,mass:m});}}
 function exportArt(){const l=document.createElement('a');l.download=`gravity_art_${Date.now()}.png`;l.href=artC.toDataURL('image/png');l.click();}
 
 // Render
