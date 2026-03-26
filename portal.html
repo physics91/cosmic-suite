@@ -111,6 +111,10 @@ function anim(){requestAnimationFrame(anim);t+=.01;
     // Icon
     X.globalAlpha=isHov?.8:.3;X.font=(isHov?16:11)+'px sans-serif';X.textAlign='center';X.textBaseline='middle';
     X.fillText(exp.icon,px,py);
+    // Sparkles on hover
+    if(isHov){for(let s=0;s<3;s++){const sa=Math.random()*Math.PI*2;const sd=sz+Math.random()*20;
+      X.globalAlpha=Math.random()*.2;X.fillStyle=exp.color;X.beginPath();
+      X.arc(px+Math.cos(sa)*sd,py+Math.sin(sa)*sd,1,0,Math.PI*2);X.fill();}}
     // Label — always show (dimmer when not hovered)
     X.globalAlpha=isHov?.5:.12;X.font=(isHov?'10':'7')+'px sans-serif';X.fillStyle='#fff';
     X.fillText(exp.name,px,py+sz+12);}
