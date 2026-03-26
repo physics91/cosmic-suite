@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gravity Life</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='14' y='8' width='4' height='4' fill='%2344ff88' opacity='.5'/><rect x='14' y='22' width='4' height='4' fill='%2344ff88' opacity='.3'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#020208;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+    .btn.active{background:rgba(68,255,136,.1);border-color:rgba(68,255,136,.3)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">CONWAY + GRAVITY &middot; LIFE FALLS &middot; DRAW TO SEED</div>
+<div id="stats"></div>
+<button class="btn active" style="bottom:16px;right:16px" id="btnRun" onclick="running=!running;this.classList.toggle('active')">Running</button>
+<button class="btn" style="bottom:16px;right:90px" onclick="clear_()">Clear</button>
+<button class="btn" style="bottom:16px;right:140px" onclick="rain()">Rain</button>
+<button class="btn" style="bottom:16px;right:195px" onclick="cycleGravity()">Gravity: <span id="gV">Normal</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="portal.html" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>document.getElementById('random-jump').onclick=function(){const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chaos-map.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','orbits.html','order.html','pendulum.html','pi.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','spirograph.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false;};</script>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+const CELL=4;
+let cols,rows,grid,glow;
+let running=true,gen=0,population=0,gravityMode=0;
+
+const GRAVITY_MODES=['Normal','Heavy','None','Reverse'];
+
+function resize(){
+  W=C.width=innerWidth;H=C.height=innerHeight;
+  cols=Math.ceil(W/CELL);rows=Math.ceil(H/CELL);
+  grid=new Uint8Array(cols*rows);
+  glow=new Float32Array(cols*rows);
+}
+resize();addEventListener('resize',resize);
+
+function idx(x,y){return((y%rows)+rows)%rows*cols+((x%cols)+cols)%cols;}
+
+function step(){
+  const next=new Uint8Array(cols*rows);
+  population=0;
+
+  // Step 1: Conway rules
+  for(let y=0;y<rows;y++){
+    for(let x=0;x<cols;x++){
+      let neighbors=0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(dx===0&&dy===0)continue;
+        neighbors+=grid[idx(x+dx,y+dy)];
+      }
+      const i=y*cols+x;
+      if(grid[i]){
+        next[i]=(neighbors===2||neighbors===3)?1:0;
+        if(!next[i])glow[i]=1;
+      }else{
+        next[i]=neighbors===3?1:0;
+        if(next[i])glow[i]=1;
+      }
+    }
+  }
+
+  // Step 2: Gravity — alive cells fall
+  const fallen=new Uint8Array(cols*rows);
+  const gStr=gravityMode===0?1:gravityMode===1?3:gravityMode===3?-1:0;
+
+  if(gStr!==0){
+    // Process bottom-up for downward gravity, top-down for reverse
+    const startY=gStr>0?rows-2:1;
+    const endY=gStr>0?-1:rows;
+    const stepY=gStr>0?-1:1;
+
+    for(let y=startY;y!==endY;y+=stepY){
+      for(let x=0;x<cols;x++){
+        const i=y*cols+x;
+        if(!next[i])continue;
+        // Try to fall
+        const below=y+gStr;
+        if(below>=0&&below<rows){
+          const bi=below*cols+x;
+          if(!next[bi]&&!fallen[bi]&&Math.random()<.3*Math.abs(gStr)){
+            next[bi]=1;next[i]=0;fallen[bi]=1;
+            glow[bi]=.3;
+          }
+        }
+      }
+    }
+  }
+
+  // Count population
+  for(let i=0;i<cols*rows;i++)if(next[i])population++;
+  grid=next;gen++;
+}
+
+function clear_(){grid.fill(0);glow.fill(0);gen=0;}
+function cycleGravity(){gravityMode=(gravityMode+1)%GRAVITY_MODES.length;document.getElementById('gV').textContent=GRAVITY_MODES[gravityMode];}
+function rain(){
+  for(let x=0;x<cols;x++){
+    if(Math.random()<.3)grid[x]=1;
+  }
+}
+
+// === INPUT ===
+let painting=false;
+C.addEventListener('mousedown',e=>{painting=true;paint(e.clientX,e.clientY);});
+C.addEventListener('mousemove',e=>{if(painting)paint(e.clientX,e.clientY);});
+addEventListener('mouseup',()=>{painting=false;});
+C.addEventListener('touchstart',e=>{e.preventDefault();painting=true;paint(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+C.addEventListener('touchmove',e=>{e.preventDefault();if(painting)paint(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+C.addEventListener('touchend',()=>{painting=false;});
+
+function paint(mx,my){
+  const cx=Math.floor(mx/CELL),cy=Math.floor(my/CELL);
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    if(Math.random()<.7){const i=idx(cx+dx,cy+dy);grid[i]=1;glow[i]=1;}
+  }
+}
+
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();running=!running;document.getElementById('btnRun').classList.toggle('active');}
+  if(e.key==='c')clear_();
+  if(e.key==='r')rain();
+  if(e.key==='g')cycleGravity();
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+});
+
+// Seed initial
+rain();
+
+// === RENDER ===
+let imgData=null;
+const offC=document.createElement('canvas');
+const offX=offC.getContext('2d');
+
+function render(){
+  for(let i=0;i<glow.length;i++)if(glow[i]>0)glow[i]*=.9;
+
+  offC.width=cols;offC.height=rows;
+  if(!imgData||imgData.width!==cols)imgData=new ImageData(cols,rows);
+  const d=imgData.data;
+
+  for(let i=0;i<cols*rows;i++){
+    const pi=i*4;
+    const g=glow[i];
+    if(grid[i]){
+      const bright=g>.3;
+      d[pi]=bright?150:30;d[pi+1]=bright?255:180;d[pi+2]=bright?150:80;
+    }else if(g>.01){
+      d[pi]=Math.floor(60*g);d[pi+1]=Math.floor(30*g);d[pi+2]=Math.floor(10*g);
+    }else{
+      d[pi]=2;d[pi+1]=2;d[pi+2]=8;
+    }
+    d[pi+3]=255;
+  }
+
+  offX.putImageData(imgData,0,0);
+  X.imageSmoothingEnabled=false;
+  X.drawImage(offC,0,0,cols,rows,0,0,W,H);
+
+  document.getElementById('stats').textContent=
+    'gen: '+gen+'\npop: '+population+'\ngravity: '+GRAVITY_MODES[gravityMode];
+}
+
+function anim(){
+  requestAnimationFrame(anim);
+  if(running)step();
+  render();
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="gravity-life.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
