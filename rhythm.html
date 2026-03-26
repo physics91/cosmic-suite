@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Rhythm</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='8' fill='none' stroke='%23ff88aa' stroke-width='1' opacity='.5'/><circle cx='16' cy='16' r='4' fill='none' stroke='%23ffcc44' stroke-width='1' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#060610;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:default;display:flex;justify-content:center;align-items:center;height:100vh}
+    canvas{position:fixed;top:0;left:0}
+    #phase{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.3);font-size:20px;font-weight:200;letter-spacing:8px;z-index:2;pointer-events:none;transition:all .5s}
+    #info{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:10px;letter-spacing:2px;z-index:2;pointer-events:none}
+    #top{position:fixed;top:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:10px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #controls{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:3}
+    .btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.4);padding:5px 14px;border-radius:12px;cursor:pointer;font-size:10px;transition:all .2s}
+    .btn:hover{background:rgba(255,255,255,.1);color:#fff}
+    .btn.on{background:rgba(255,136,170,.12);border-color:rgba(255,136,170,.25);color:#fff}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="top">BREATHE + MUSIC = RHYTHM</div>
+<div id="phase">CLICK TO BEGIN</div>
+<div id="info"></div>
+<div id="controls">
+  <button class="btn on" id="btnStart" onclick="toggle()">Start</button>
+  <button class="btn" onclick="cycleScale()">Scale</button>
+  <button class="btn" onclick="cycleSpeed()">Speed</button>
+</div>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// Audio
+let aC=null,mG=null;
+function initAudio(){aC=new(AudioContext||webkitAudioContext)();mG=aC.createGain();mG.gain.value=.12;
+  const cv=aC.createConvolver(),r=aC.sampleRate,l=r*2,im=aC.createBuffer(2,l,r);
+  for(let c=0;c<2;c++){const d=im.getChannelData(c);for(let i=0;i<l;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/l,2);}
+  cv.buffer=im;const rg=aC.createGain();rg.gain.value=.3;
+  mG.connect(aC.destination);mG.connect(cv);cv.connect(rg);rg.connect(aC.destination);}
+
+const SCALES={
+  minor:[0,2,3,5,7,8,10],major:[0,2,4,5,7,9,11],
+  pentatonic:[0,2,4,7,9],japanese:[0,1,5,7,8]};
+const SCALE_NAMES=Object.keys(SCALES);
+let scaleIdx=0,speedIdx=1;
+const SPEEDS=[{name:'Slow',inhale:6,exhale:8},{name:'Medium',inhale:4,exhale:6},{name:'Fast',inhale:3,exhale:4}];
+
+// State
+let active=false,phase=0,timer=0,noteIdx=0,totalNotes=0;
+// phase: 0=inhale, 1=exhale
+
+function toggle(){
+  active=!active;document.getElementById('btnStart').textContent=active?'Pause':'Start';
+  document.getElementById('btnStart').classList.toggle('on',active);
+  if(active&&!aC)initAudio();}
+function cycleScale(){scaleIdx=(scaleIdx+1)%SCALE_NAMES.length;}
+function cycleSpeed(){speedIdx=(speedIdx+1)%SPEEDS.length;}
+
+addEventListener('click',e=>{if(!e.target.closest('#controls,a'))if(!active)toggle();});
+addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();toggle();}
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
+
+function playNote(note,vol,dur){
+  if(!aC)return;const t=aC.currentTime;
+  const freq=440*Math.pow(2,(note-69)/12);
+  const harmonics=[1,2,5.4];
+  for(let i=0;i<harmonics.length;i++){
+    const o=aC.createOscillator(),g=aC.createGain();
+    o.type=i===0?'sine':'triangle';o.frequency.value=freq*harmonics[i];
+    g.gain.setValueAtTime(vol/(i+1),t);g.gain.exponentialRampToValueAtTime(.0001,t+dur-i*.2);
+    o.connect(g);g.connect(mG);o.start(t);o.stop(t+dur);}}
+
+// Visuals
+const particles=Array.from({length:120},()=>({a:Math.random()*Math.PI*2,d:80+Math.random()*200,s:.001+Math.random()*.003,sz:1+Math.random()*2}));
+let rings=[];
+
+function anim(){requestAnimationFrame(anim);
+  const spd=SPEEDS[speedIdx];const scaleName=SCALE_NAMES[scaleIdx];
+  const scale=SCALES[scaleName];const cx=W/2,cy=H/2;
+
+  if(active){
+    timer+=1/60;
+    const phaseDur=phase===0?spd.inhale:spd.exhale;
+    const progress=timer/phaseDur;
+
+    if(timer>=phaseDur){timer=0;phase=phase===0?1:0;}
+
+    // Play notes at intervals
+    const noteInterval=phaseDur/6;// 6 notes per phase
+    const currentNotePos=Math.floor(progress*6);
+    if(currentNotePos!==noteIdx){
+      noteIdx=currentNotePos;totalNotes++;
+      const baseNote=60;
+      let scaleNote;
+      if(phase===0){// Inhale — ascending
+        scaleNote=scale[currentNotePos%scale.length]+Math.floor(currentNotePos/scale.length)*12;
+      }else{// Exhale — descending
+        const descIdx=5-currentNotePos;
+        scaleNote=scale[Math.abs(descIdx)%scale.length]+Math.floor(Math.abs(descIdx)/scale.length)*12;}
+      playNote(baseNote+scaleNote,.03,1.5);
+      // Spawn ring
+      rings.push({r:0,maxR:100+Math.random()*100,hue:(totalNotes*30)%360,life:1});}
+
+    // Phase display
+    const phaseText=phase===0?'INHALE':'EXHALE';
+    document.getElementById('phase').textContent=phaseText;
+    document.getElementById('phase').style.color=phase===0?'rgba(100,180,255,.4)':'rgba(255,150,100,.4)';
+    document.getElementById('phase').style.fontSize=(16+progress*8)+'px';
+
+    // Breathing scale
+    var breathScale=phase===0?.7+progress*.5:1.2-progress*.5;
+  }else{var breathScale=.85+Math.sin(Date.now()*.001)*.05;}
+
+  // Clear
+  X.fillStyle='rgba(6,6,16,.08)';X.fillRect(0,0,W,H);
+
+  // Mandala
+  for(let ring=0;ring<5;ring++){
+    const r=(60+ring*30)*breathScale;const segs=6+ring*3;
+    X.globalAlpha=.03;X.strokeStyle=phase===0?'#6688ff':'#ff8866';X.lineWidth=.5;
+    X.beginPath();
+    for(let i=0;i<=segs;i++){const a=i*Math.PI*2/segs+Date.now()*.0001*(ring%2?1:-1);
+      const px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;i===0?X.moveTo(px,py):X.lineTo(px,py);}
+    X.closePath();X.stroke();}
+
+  // Center
+  const cR=40*breathScale;
+  const cg=X.createRadialGradient(cx,cy,0,cx,cy,cR*2);
+  cg.addColorStop(0,phase===0?'rgba(100,140,255,.08)':'rgba(255,140,100,.08)');cg.addColorStop(1,'rgba(0,0,0,0)');
+  X.globalAlpha=.8;X.fillStyle=cg;X.beginPath();X.arc(cx,cy,cR*2,0,Math.PI*2);X.fill();
+  X.globalAlpha=.15;X.strokeStyle='#fff';X.lineWidth=1;X.beginPath();X.arc(cx,cy,cR,0,Math.PI*2);X.stroke();
+
+  // Particles
+  for(const p of particles){
+    p.a+=p.s*(phase===0?1.2:.6);const d=p.d*breathScale;
+    const px=cx+Math.cos(p.a)*d,py=cy+Math.sin(p.a)*d;
+    X.globalAlpha=.12;X.fillStyle=phase===0?'#88aaff':'#ffaa88';
+    X.beginPath();X.arc(px,py,p.sz*breathScale,0,Math.PI*2);X.fill();}
+
+  // Note rings
+  for(let i=rings.length-1;i>=0;i--){const rn=rings[i];rn.r+=2;rn.life-=.015;
+    if(rn.life<=0){rings.splice(i,1);continue;}
+    X.globalAlpha=rn.life*.1;X.strokeStyle=`hsl(${rn.hue},60%,60%)`;X.lineWidth=1;
+    X.beginPath();X.arc(cx,cy,rn.r,0,Math.PI*2);X.stroke();}
+
+  X.globalAlpha=1;
+  document.getElementById('info').textContent=scaleName.toUpperCase()+' · '+SPEEDS[speedIdx].name.toUpperCase()+' · '+totalNotes+' notes';}
+anim();
+</script>
+</body>
+</html>
