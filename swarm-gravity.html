@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Swarm Gravity</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='4' fill='%236644ff' opacity='.3'/><polygon points='22,10 21,12 23,12' fill='%2388ccff' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#020210;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">CLICK TO PLACE GRAVITY WELLS &middot; BOIDS STRUGGLE TO FLOCK &middot; RIGHT-CLICK TO REMOVE</div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="clearWells()">Clear Wells</button>
+<button class="btn" style="bottom:16px;right:110px" onclick="presetOrbit()">Orbit</button>
+<button class="btn" style="bottom:16px;right:170px" onclick="presetDual()">Binary</button>
+<button class="btn" style="bottom:16px;right:235px" onclick="addBoids(50)">+50 Boids</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="#" onclick="const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','pendulum.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// === BOIDS ===
+const boids=[];
+const wells=[];
+let captured=0;
+
+class Boid{
+  constructor(x,y){
+    this.x=x||Math.random()*W;this.y=y||Math.random()*H;
+    this.vx=(Math.random()-.5)*3;this.vy=(Math.random()-.5)*3;
+    this.alive=true;this.trail=[];this.hue=200+Math.random()*40;
+    this.panic=0; // increases near wells
+  }
+}
+
+function addBoids(n){for(let i=0;i<n;i++)boids.push(new Boid());}
+addBoids(150);
+
+// === WELLS ===
+addEventListener('click',e=>{if(e.target.closest('.btn,a'))return;
+  wells.push({x:e.clientX,y:e.clientY,mass:60+Math.random()*40,phase:Math.random()*Math.PI*2});});
+addEventListener('contextmenu',e=>{e.preventDefault();
+  let best=-1,bd=2500;for(let i=0;i<wells.length;i++){const dx=wells[i].x-e.clientX,dy=wells[i].y-e.clientY;if(dx*dx+dy*dy<bd){bd=dx*dx+dy*dy;best=i;}}
+  if(best>=0)wells.splice(best,1);});
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});if(e.key==='c')clearWells();});
+
+function clearWells(){wells.length=0;}
+function presetOrbit(){clearWells();wells.push({x:W/2,y:H/2,mass:120,phase:0});}
+function presetDual(){clearWells();wells.push({x:W*.35,y:H/2,mass:80,phase:0});wells.push({x:W*.65,y:H/2,mass:80,phase:Math.PI});}
+
+// === PHYSICS ===
+const PERCEPTION=50,SEP_DIST=20,MAX_SPEED=5,MAX_FORCE=.2;
+
+function update(){
+  for(let bi=boids.length-1;bi>=0;bi--){
+    const b=boids[bi];if(!b.alive)continue;
+    let sepX=0,sepY=0,sepN=0;
+    let aliX=0,aliY=0,aliN=0;
+    let cohX=0,cohY=0,cohN=0;
+    b.panic=0;
+
+    // Boid rules
+    for(const other of boids){
+      if(other===b||!other.alive)continue;
+      const dx=other.x-b.x,dy=other.y-b.y;
+      const d=Math.sqrt(dx*dx+dy*dy);if(d>PERCEPTION)continue;
+      if(d<SEP_DIST&&d>0){sepX-=dx/d;sepY-=dy/d;sepN++;}
+      aliX+=other.vx;aliY+=other.vy;aliN++;
+      cohX+=other.x;cohY+=other.y;cohN++;
+    }
+
+    let fx=0,fy=0;
+    if(sepN>0){fx+=sepX/sepN*1.5;fy+=sepY/sepN*1.5;}
+    if(aliN>0){fx+=(aliX/aliN-b.vx)*.05;fy+=(aliY/aliN-b.vy)*.05;}
+    if(cohN>0){fx+=(cohX/cohN-b.x)*.003;fy+=(cohY/cohN-b.y)*.003;}
+
+    // Gravity from wells
+    for(const w of wells){
+      const dx=w.x-b.x,dy=w.y-b.y;
+      const d2=dx*dx+dy*dy;const d=Math.sqrt(d2);
+      // Capture — too close = absorbed
+      if(d<15){b.alive=false;captured++;continue;}
+      const gForce=w.mass*20/(d2+500);
+      fx+=dx/d*gForce;fy+=dy/d*gForce;
+      // Panic increases near wells
+      if(d<150)b.panic=Math.max(b.panic,1-d/150);
+    }
+    if(!b.alive){boids.splice(bi,1);continue;}
+
+    // Panic boosts separation and speed
+    if(b.panic>.3){
+      // Try to flee — boost away from nearest well
+      for(const w of wells){
+        const dx=w.x-b.x,dy=w.y-b.y;
+        const d=Math.sqrt(dx*dx+dy*dy)||1;
+        if(d<150){fx-=dx/d*b.panic*.3;fy-=dy/d*b.panic*.3;}
+      }
+    }
+
+    const fMag=Math.sqrt(fx*fx+fy*fy);
+    const maxF=MAX_FORCE*(1+b.panic*2);
+    if(fMag>maxF){fx=fx/fMag*maxF;fy=fy/fMag*maxF;}
+
+    b.vx+=fx;b.vy+=fy;
+    const spd=Math.sqrt(b.vx*b.vx+b.vy*b.vy);
+    const maxS=MAX_SPEED*(1+b.panic);
+    if(spd>maxS){b.vx=b.vx/spd*maxS;b.vy=b.vy/spd*maxS;}
+
+    b.x+=b.vx;b.y+=b.vy;
+    if(b.x<0)b.x=W;if(b.x>W)b.x=0;if(b.y<0)b.y=H;if(b.y>H)b.y=0;
+    b.trail.push({x:b.x,y:b.y});if(b.trail.length>12)b.trail.shift();
+  }
+
+  // Respawn if too few
+  if(boids.length<30)for(let i=0;i<5;i++)boids.push(new Boid());
+}
+
+// === RENDER ===
+let time=0;
+function anim(){requestAnimationFrame(anim);time+=.016;
+  X.fillStyle='rgba(2,2,16,.1)';X.fillRect(0,0,W,H);
+  update();
+
+  // Wells
+  for(const w of wells){
+    w.phase+=.02;
+    const r=Math.sqrt(w.mass)*2;
+    const grad=X.createRadialGradient(w.x,w.y,0,w.x,w.y,r*4);
+    grad.addColorStop(0,'rgba(100,68,255,.15)');grad.addColorStop(.5,'rgba(40,20,80,.05)');grad.addColorStop(1,'rgba(0,0,0,0)');
+    X.fillStyle=grad;X.globalAlpha=.5;X.beginPath();X.arc(w.x,w.y,r*4,0,Math.PI*2);X.fill();
+    // Accretion ring
+    X.strokeStyle='rgba(100,68,255,.15)';X.lineWidth=1;X.globalAlpha=.2;
+    X.beginPath();X.ellipse(w.x,w.y,r*2.5,r*.7,w.phase,0,Math.PI*2);X.stroke();
+    X.globalAlpha=.3;X.fillStyle='rgba(150,100,255,.2)';
+    X.beginPath();X.arc(w.x,w.y,r*.3,0,Math.PI*2);X.fill();
+  }
+
+  // Boid trails
+  for(const b of boids){
+    if(b.trail.length<2)continue;
+    const color=b.panic>.3?'rgba(255,100,80,.06)':'rgba(136,200,255,.04)';
+    X.strokeStyle=color;X.lineWidth=.5;X.globalAlpha=1;
+    X.beginPath();
+    for(let i=0;i<b.trail.length;i++)i===0?X.moveTo(b.trail[i].x,b.trail[i].y):X.lineTo(b.trail[i].x,b.trail[i].y);
+    X.stroke();
+  }
+
+  // Boids
+  for(const b of boids){
+    const angle=Math.atan2(b.vy,b.vx);
+    const spd=Math.sqrt(b.vx*b.vx+b.vy*b.vy);
+    const sz=2.5+spd*.3;
+    // Color shifts with panic
+    const hue=b.panic>.3?0+b.panic*30:b.hue;
+    const sat=b.panic>.3?80:50;
+    X.globalAlpha=.5+b.panic*.3;X.fillStyle='hsl('+hue+','+sat+'%,60%)';
+    X.save();X.translate(b.x,b.y);X.rotate(angle);
+    X.beginPath();X.moveTo(sz,0);X.lineTo(-sz*.5,-sz*.4);X.lineTo(-sz*.5,sz*.4);X.closePath();X.fill();
+    X.restore();
+  }
+
+  X.globalAlpha=1;
+  document.getElementById('stats').textContent=
+    'boids: '+boids.length+'\nwells: '+wells.length+'\ncaptured: '+captured;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="swarm-gravity.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
