@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neural</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='12' cy='14' r='2' fill='%2388ddff' opacity='.5'/><circle cx='20' cy='14' r='2' fill='%2388ddff' opacity='.5'/><line x1='14' y1='14' x2='18' y2='14' stroke='%2388ddff' stroke-width='.5' opacity='.3'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#040410;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">CLICK TO PLACE NEURONS &middot; RIGHT-CLICK TO FIRE &middot; SPACE = RANDOM FIRE</div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="clearAll()">Clear</button>
+<button class="btn" style="bottom:16px;right:70px" onclick="randomNetwork(40)">Random 40</button>
+<button class="btn" style="bottom:16px;right:165px" onclick="randomNetwork(100)">Random 100</button>
+<button class="btn" style="bottom:16px;right:270px" onclick="layeredNetwork()">Layers</button>
+<button class="btn" style="bottom:40px;right:16px" onclick="autoFire=!autoFire;this.textContent=autoFire?'Auto ON':'Auto OFF'">Auto OFF</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// === NEURAL NETWORK ===
+const neurons=[];
+const synapses=[];
+const signals=[];
+let autoFire=false,totalFires=0;
+
+class Neuron{
+  constructor(x,y){
+    this.x=x;this.y=y;
+    this.potential=0; // -1 to 1, fires at threshold
+    this.threshold=.7;
+    this.firing=0; // glow timer
+    this.refractory=0; // cooldown after firing
+    this.hue=200+Math.random()*40;
+  }
+  fire(){
+    if(this.refractory>0)return;
+    this.firing=1;this.potential=0;this.refractory=30;totalFires++;
+    // Send signal through all outgoing synapses
+    for(const s of synapses){
+      if(s.from===this){
+        signals.push({synapse:s,progress:0,strength:s.weight});
+      }
+    }
+  }
+  update(){
+    if(this.refractory>0)this.refractory--;
+    this.firing*=.92;
+    this.potential*=.995; // leak
+    // Check threshold
+    if(this.potential>=this.threshold&&this.refractory===0)this.fire();
+  }
+}
+
+class Synapse{
+  constructor(from,to){
+    this.from=from;this.to=to;
+    this.weight=.3+Math.random()*.5;
+    this.activity=0; // visual glow
+  }
+}
+
+// === NETWORK BUILDING ===
+function addNeuron(x,y){
+  const n=new Neuron(x,y);
+  neurons.push(n);
+  // Auto-connect to nearby neurons
+  for(const other of neurons){
+    if(other===n)continue;
+    const d=Math.sqrt((n.x-other.x)**2+(n.y-other.y)**2);
+    if(d<200&&Math.random()<.6){
+      synapses.push(new Synapse(n,other));
+      if(Math.random()<.3)synapses.push(new Synapse(other,n)); // some bidirectional
+    }
+  }
+  return n;
+}
+
+function clearAll(){neurons.length=0;synapses.length=0;signals.length=0;totalFires=0;}
+
+function randomNetwork(count){
+  clearAll();
+  for(let i=0;i<count;i++){
+    addNeuron(W*.1+Math.random()*W*.8,H*.1+Math.random()*H*.8);
+  }
+}
+
+function layeredNetwork(){
+  clearAll();
+  const layers=[5,8,10,8,5];
+  const layerNeurons=[];
+  for(let l=0;l<layers.length;l++){
+    const row=[];
+    for(let i=0;i<layers[l];i++){
+      const x=W*.15+l/(layers.length-1)*W*.7;
+      const y=H*.15+i/(layers[l]-1)*H*.7;
+      const n=new Neuron(x,y);
+      neurons.push(n);row.push(n);
+    }
+    // Connect to previous layer
+    if(l>0){
+      for(const n of row){
+        for(const prev of layerNeurons[l-1]){
+          if(Math.random()<.7)synapses.push(new Synapse(prev,n));
+        }
+      }
+    }
+    layerNeurons.push(row);
+  }
+}
+
+// === INPUT ===
+addEventListener('click',e=>{
+  if(e.target.closest('.btn,a'))return;
+  addNeuron(e.clientX,e.clientY);
+});
+addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  // Fire nearest neuron
+  let best=null,bd=Infinity;
+  for(const n of neurons){
+    const d=(n.x-e.clientX)**2+(n.y-e.clientY)**2;
+    if(d<bd){bd=d;best=n;}
+  }
+  if(best)best.fire();
+});
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();
+    // Fire random neuron
+    if(neurons.length)neurons[Math.random()*neurons.length|0].fire();
+  }
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='c')clearAll();
+});
+// Touch — tap to place, long press to fire
+let touchTimer=null;
+C.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  touchTimer=setTimeout(()=>{
+    let best=null,bd=Infinity;
+    for(const n of neurons){const d=(n.x-t.clientX)**2+(n.y-t.clientY)**2;if(d<bd){bd=d;best=n;}}
+    if(best)best.fire();
+    touchTimer=null;
+  },400);
+},{passive:false});
+C.addEventListener('touchend',e=>{
+  if(touchTimer){clearTimeout(touchTimer);touchTimer=null;
+    const t=e.changedTouches[0];addNeuron(t.clientX,t.clientY);}
+});
+
+// === AUDIO ===
+let aC=null;
+function playFire(n){
+  if(!aC)try{aC=new(AudioContext||webkitAudioContext)();}catch(e){return;}
+  const t=aC.currentTime;
+  const o=aC.createOscillator(),g=aC.createGain();
+  o.type='sine';o.frequency.value=300+n.y/H*400;
+  g.gain.setValueAtTime(.015,t);g.gain.exponentialRampToValueAtTime(.001,t+.15);
+  o.connect(g);g.connect(aC.destination);o.start(t);o.stop(t+.15);
+}
+
+// Init with small network
+randomNetwork(30);
+
+// === RENDER ===
+function anim(){requestAnimationFrame(anim);
+  X.fillStyle='rgba(4,4,16,.08)';X.fillRect(0,0,W,H);
+
+  // Auto fire
+  if(autoFire&&Math.random()<.03&&neurons.length){
+    neurons[Math.random()*neurons.length|0].fire();
+  }
+
+  // Update signals
+  for(let i=signals.length-1;i>=0;i--){
+    const sig=signals[i];
+    sig.progress+=.04;
+    sig.synapse.activity=Math.max(sig.synapse.activity,.5);
+    if(sig.progress>=1){
+      // Arrive at target neuron
+      sig.synapse.to.potential+=sig.strength;
+      signals.splice(i,1);
+    }
+  }
+
+  // Update neurons
+  for(const n of neurons){
+    n.update();
+    if(n.firing>.9)playFire(n);
+  }
+
+  // Draw synapses
+  for(const s of synapses){
+    s.activity*=.95;
+    X.globalAlpha=.02+s.activity*.15;
+    X.strokeStyle='hsla(200,50%,50%,'+(s.activity+.1)+')';
+    X.lineWidth=.3+s.activity*2;
+    X.beginPath();X.moveTo(s.from.x,s.from.y);X.lineTo(s.to.x,s.to.y);X.stroke();
+  }
+
+  // Draw signals traveling along synapses
+  for(const sig of signals){
+    const s=sig.synapse;
+    const x=s.from.x+(s.to.x-s.from.x)*sig.progress;
+    const y=s.from.y+(s.to.y-s.from.y)*sig.progress;
+    X.globalAlpha=.5;X.fillStyle='#88ddff';
+    X.beginPath();X.arc(x,y,2+sig.strength*2,0,Math.PI*2);X.fill();
+    X.globalAlpha=.15;
+    X.beginPath();X.arc(x,y,6+sig.strength*4,0,Math.PI*2);X.fill();
+  }
+
+  // Draw neurons
+  for(const n of neurons){
+    // Glow
+    const glowR=8+n.firing*25+n.potential*10;
+    X.globalAlpha=.03+n.firing*.2+n.potential*.05;
+    X.fillStyle='hsl('+n.hue+',60%,60%)';
+    X.beginPath();X.arc(n.x,n.y,glowR,0,Math.PI*2);X.fill();
+    // Body
+    X.globalAlpha=.3+n.firing*.6+n.potential*.2;
+    X.fillStyle=n.firing>.1?'#ffffff':'hsl('+n.hue+',50%,55%)';
+    const sz=3+n.potential*2;
+    X.beginPath();X.arc(n.x,n.y,sz,0,Math.PI*2);X.fill();
+    // Refractory indicator
+    if(n.refractory>0){
+      X.globalAlpha=.05;X.strokeStyle='#ff4444';X.lineWidth=.5;
+      X.beginPath();X.arc(n.x,n.y,sz+4,0,Math.PI*2*n.refractory/30);X.stroke();
+    }
+  }
+
+  X.globalAlpha=1;
+  const activeCount=neurons.filter(n=>n.firing>.1).length;
+  document.getElementById('stats').textContent=
+    'neurons: '+neurons.length+'\nsynapses: '+synapses.length+
+    '\nactive: '+activeCount+'\nsignals: '+signals.length+
+    '\ntotal fires: '+totalFires;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="neural.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
