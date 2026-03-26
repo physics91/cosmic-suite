@@ -28,6 +28,7 @@ resize();addEventListener('resize',resize);
 
 // Game state
 let state='menu',score=0,bestScore=+(localStorage.getItem('orbit_best')||0),bestLevel=+(localStorage.getItem('orbit_blvl')||1),level=1,games=+(localStorage.getItem('orbit_games')||0);
+let fpvMode=false;// first-person view toggle
 let ship={x:0,y:0,vx:0,vy:0,trail:[],alive:true,fuel:100},combo=0,comboTimer=0;
 let stars=[],collectibles=[],particles=[],survivalTime=0;
 let shakeAmt=0,slowmo=1;
@@ -171,6 +172,17 @@ function render(){requestAnimationFrame(render);
   // Particles
   for(const p of particles){X.globalAlpha=(p.life/20)*.5;X.fillStyle=p.color;
     X.beginPath();X.arc(p.x,p.y,1.5,0,Math.PI*2);X.fill();}
+  // FPV cockpit view
+  if(fpvMode&&state==='play'){X.save();X.setTransform(1,0,0,1,0,0);
+    X.globalAlpha=.25;X.fillStyle='#000';X.fillRect(0,0,W,H);
+    for(const star of stars){const dx=star.x-ship.x,dy=star.y-ship.y,d=Math.sqrt(dx*dx+dy*dy);
+      if(d<5||d>400)continue;const p=200/d;const sx=W/2+dx*p;const sy=H/2+dy*p;
+      X.globalAlpha=p*.7;X.fillStyle=star.color;X.beginPath();X.arc(sx,sy,star.r*p*2,0,Math.PI*2);X.fill();}
+    for(const c of collectibles){if(c.collected)continue;const dx=c.x-ship.x,dy=c.y-ship.y,d=Math.sqrt(dx*dx+dy*dy);
+      if(d<5||d>300)continue;const p=200/d;X.globalAlpha=p*.5;X.fillStyle='#ffcc44';X.beginPath();X.arc(W/2+dx*p,H/2+dy*p,5*p,0,Math.PI*2);X.fill();}
+    X.globalAlpha=.05;X.strokeStyle='#44aaff';X.lineWidth=1;X.beginPath();X.arc(W/2,H/2,60,0,Math.PI*2);X.stroke();
+    X.beginPath();X.moveTo(W/2-8,H/2);X.lineTo(W/2+8,H/2);X.moveTo(W/2,H/2-8);X.lineTo(W/2,H/2+8);X.stroke();
+    X.restore();}
   X.globalAlpha=1;X.restore();
   const newBest=state==='play'&&score>bestScore&&bestScore>0;
   document.getElementById('score').textContent=score+(state==='play'?' · '+Math.floor(survivalTime)+'s':'')+(newBest?' NEW BEST!':'');
@@ -178,7 +190,8 @@ function render(){requestAnimationFrame(render);
   const vel=state==='play'?Math.round(Math.sqrt(ship.vx*ship.vx+ship.vy*ship.vy)*100):0;
   document.getElementById('hint').textContent=state==='play'?'LVL '+level+(vel?' · SPD '+vel:'')+(alt?' · ALT '+alt:'')+(combo>1?' · x'+combo:'')+(boosting?' · BOOST':''):'';}
 render();
-addEventListener("keydown",e=>{if(e.key==="f"&&!e.target.closest("input"))document.documentElement.requestFullscreen().catch(()=>{});});
+addEventListener("keydown",e=>{if(e.key==="f"&&!e.target.closest("input"))document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==="v")fpvMode=!fpvMode;});
 </script>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
 </body>
