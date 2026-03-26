@@ -45,6 +45,7 @@
   <button class="btn" onclick="spiralWells()">Spiral</button>
   <button class="btn" onclick="gridWells()">Grid</button>
   <button class="btn" onclick="symm=!symm;this.textContent=symm?'Symm ON':'Symm OFF'">Symm OFF</button>
+  <button class="btn" onclick="repel=!repel;this.textContent=repel?'Repel':'Attract'">Attract</button>
   <button class="btn" onclick="exportArt()">Export PNG</button>
 </div>
 <script>
@@ -80,7 +81,7 @@ let wells=[];
 function addWell(x,y){const m=+(document.getElementById('gStr').value);wells.push({x,y,mass:m});
   if(symm){wells.push({x:W-x,y,mass:m});wells.push({x,y:H-y,mass:m});wells.push({x:W-x,y:H-y,mass:m});}}
 addEventListener('click',e=>{if(e.target.closest('#controls,#palette,#settings'))return;addWell(e.clientX,e.clientY);});
-let symm=false;
+let symm=false,repel=false;
 addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];addWell(t.clientX,t.clientY);});
 addEventListener('contextmenu',e=>{e.preventDefault();
   // Remove nearest well
@@ -127,7 +128,7 @@ function anim(){requestAnimationFrame(anim);
     // Apply gravity from wells
     for(const w of wells){
       const dx=w.x-p.x,dy=w.y-p.y,ds=dx*dx+dy*dy+100;
-      const d=Math.sqrt(ds);const f=w.mass/ds;
+      const d=Math.sqrt(ds);const f=w.mass/ds*(repel?-1:1);
       p.vx+=(dx/d)*f;p.vy+=(dy/d)*f;}
     // Speed limit
     const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
