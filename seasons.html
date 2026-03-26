@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seasons</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #season-name{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:24px;font-weight:100;letter-spacing:12px;z-index:2;pointer-events:none;opacity:.15}
+    #date{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;opacity:.1}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="season-name"></div>
+<div id="date"></div>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.05);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr;</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+const particles=[];
+let time=0;
+
+function getSeason(){
+  const m=new Date().getMonth();
+  if(m>=2&&m<=4)return{name:'SPRING',bg:[15,25,15],particles:'petals',color:'#ffaacc',wind:.3};
+  if(m>=5&&m<=7)return{name:'SUMMER',bg:[5,10,20],particles:'fireflies',color:'#ccff44',wind:.1};
+  if(m>=8&&m<=10)return{name:'AUTUMN',bg:[20,12,5],particles:'leaves',color:'#dd8822',wind:.5};
+  return{name:'WINTER',bg:[10,12,18],particles:'snow',color:'#ddeeff',wind:.2};
+}
+
+function spawnParticle(){
+  const s=getSeason();
+  const p={x:Math.random()*W,y:-10,vx:(Math.random()-.5)*s.wind*3,vy:.5+Math.random()*1.5,
+    sz:2+Math.random()*4,rot:Math.random()*Math.PI*2,rotV:(Math.random()-.5)*.05,
+    life:300+Math.random()*200,hue:0,type:s.particles};
+  if(s.particles==='petals')p.hue=330+Math.random()*30;
+  if(s.particles==='leaves')p.hue=20+Math.random()*30;
+  if(s.particles==='fireflies'){p.y=Math.random()*H;p.vy=(Math.random()-.5)*.5;p.glow=Math.random()*Math.PI*2;}
+  if(s.particles==='snow')p.hue=210;
+  particles.push(p);
+}
+
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
+
+function anim(){requestAnimationFrame(anim);time+=.016;
+  const s=getSeason();
+  const bg=s.bg;
+  X.fillStyle='rgba('+bg[0]+','+bg[1]+','+bg[2]+',.05)';X.fillRect(0,0,W,H);
+
+  if(particles.length<80&&Math.random()<.1)spawnParticle();
+
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.vy+=p.type==='fireflies'?0:.005;
+    p.vx+=Math.sin(time+p.x*.01)*s.wind*.01;
+    p.x+=p.vx;p.y+=p.vy;p.rot+=p.rotV;p.life--;
+
+    if(p.life<=0||p.y>H+20||p.x<-20||p.x>W+20){particles.splice(i,1);continue;}
+
+    const alpha=Math.min(.4,p.life/100);
+
+    if(p.type==='petals'){
+      X.globalAlpha=alpha*.5;X.fillStyle='hsl('+p.hue+',70%,80%)';
+      X.save();X.translate(p.x,p.y);X.rotate(p.rot);
+      X.beginPath();X.ellipse(0,0,p.sz,p.sz*.4,0,0,Math.PI*2);X.fill();
+      X.restore();
+    }else if(p.type==='leaves'){
+      X.globalAlpha=alpha*.4;X.fillStyle='hsl('+p.hue+',70%,45%)';
+      X.save();X.translate(p.x,p.y);X.rotate(p.rot);
+      X.beginPath();X.ellipse(0,0,p.sz,p.sz*.5,0,0,Math.PI*2);X.fill();
+      X.restore();
+    }else if(p.type==='snow'){
+      X.globalAlpha=alpha*.3;X.fillStyle='#ddeeff';
+      X.beginPath();X.arc(p.x,p.y,p.sz*.5,0,Math.PI*2);X.fill();
+    }else if(p.type==='fireflies'){
+      p.glow+=.05;
+      const glow=Math.sin(p.glow)*.5+.5;
+      X.globalAlpha=glow*.3;X.fillStyle='#ccff44';
+      X.beginPath();X.arc(p.x,p.y,1+glow*2,0,Math.PI*2);X.fill();
+      X.globalAlpha=glow*.05;
+      X.beginPath();X.arc(p.x,p.y,8+glow*5,0,Math.PI*2);X.fill();
+    }
+  }
+
+  X.globalAlpha=1;
+  document.getElementById('season-name').textContent=s.name;
+  document.getElementById('season-name').style.color=s.color;
+  const now=new Date();
+  document.getElementById('date').textContent=
+    now.getFullYear()+'.'+String(now.getMonth()+1).padStart(2,'0')+'.'+String(now.getDate()).padStart(2,'0');
+  document.getElementById('date').style.color=s.color;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="seasons.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
