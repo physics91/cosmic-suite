@@ -84,12 +84,14 @@ function update(){
     p.x+=p.vx;p.y+=p.vy;
     if(p.x<0)p.x+=W;if(p.x>=W)p.x-=W;if(p.y<0)p.y+=H;if(p.y>=H)p.y-=H;}}
 
-function anim(){requestAnimationFrame(anim);
+let _fc=0,_ft=0,_fps=0;
+function anim(){requestAnimationFrame(anim);_fc++;_ft+=16;if(_ft>=1000){_fps=_fc;_fc=0;_ft=0;}
   X.fillStyle='rgba(8,8,16,.15)';X.fillRect(0,0,W,H);update();
   for(const p of particles){const s=SPECIES[p.sp];const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
     X.globalAlpha=.04+spd*.02;X.fillStyle=s.color;X.beginPath();X.arc(p.x,p.y,4+spd*2,0,Math.PI*2);X.fill();
     X.globalAlpha=.6+spd*.2;X.beginPath();X.arc(p.x,p.y,1.5,0,Math.PI*2);X.fill();}
-  X.globalAlpha=1;}
+  X.globalAlpha=1;
+  document.getElementById('info').textContent=COUNT+' PARTICLES · '+N+' SPECIES · '+_fps+' FPS · CLICK MATRIX TO EDIT';}
 anim();
 </script>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
