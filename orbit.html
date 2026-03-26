@@ -142,6 +142,9 @@ function render(){requestAnimationFrame(render);
     X.beginPath();X.arc(star.x,star.y,star.r*4,0,Math.PI*2);X.fill();
     // Core
     X.globalAlpha=.8;X.fillStyle=star.color;X.beginPath();X.arc(star.x,star.y,star.r,0,Math.PI*2);X.fill();
+    // Safe orbit zone
+    X.globalAlpha=.015;X.strokeStyle='#44ff88';X.lineWidth=8;
+    X.beginPath();X.arc(star.x,star.y,star.r+80,0,Math.PI*2);X.stroke();
     // Danger zone
     X.globalAlpha=.02;X.strokeStyle='#ff4444';X.lineWidth=1;
     X.beginPath();X.arc(star.x,star.y,star.r+15,0,Math.PI*2);X.stroke();}
