@@ -94,6 +94,8 @@ input.addEventListener('keydown',e=>{
     const val=input.value.trim();
     if(val){const words=val.split(/\s+/);
       for(const w of words)if(w)spawnWord(w);
+      // Flash burst
+      X.globalAlpha=.08;X.fillStyle='#fff';X.fillRect(0,0,W,H);
       try{const a=new(AudioContext||webkitAudioContext)();[400,500,600].forEach((f,i)=>{const o=a.createOscillator(),g=a.createGain();o.frequency.value=f;o.type='sine';g.gain.setValueAtTime(.02,a.currentTime+i*.1);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+i*.1+.4);o.connect(g);g.connect(a.destination);o.start(a.currentTime+i*.1);o.stop(a.currentTime+i*.1+.4);});}catch(e){}
       input.value='';lastLength=0;}
     e.preventDefault();}});
