@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='10' y='10' width='4' height='4' fill='%234488ff' opacity='.4'/><rect x='18' y='10' width='4' height='4' fill='%234488ff' opacity='.4'/><rect x='10' y='18' width='4' height='4' fill='%234488ff' opacity='.4'/><rect x='18' y='18' width='4' height='4' fill='%234488ff' opacity='.4'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#030308;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #temp-bar{position:fixed;right:20px;top:50%;transform:translateY(-50%);width:8px;height:60vh;background:rgba(255,255,255,.03);border-radius:4px;z-index:2;overflow:hidden;cursor:pointer}
+    #temp-fill{position:absolute;bottom:0;width:100%;border-radius:4px;transition:height .3s}
+    #temp-label{position:fixed;right:10px;top:calc(50% + 32vh);color:rgba(255,255,255,.1);font-size:7px;letter-spacing:2px;z-index:2;transform:rotate(-90deg);transform-origin:center}
+    #state{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:11px;letter-spacing:4px;z-index:2;pointer-events:none}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">SCROLL TO CHANGE TEMPERATURE &middot; COOL TO CRYSTALLIZE &middot; HEAT TO MELT</div>
+<div id="temp-bar"><div id="temp-fill"></div></div>
+<div id="temp-label">TEMPERATURE</div>
+<div id="state">LIQUID</div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="reset()">Reset</button>
+<button class="btn" style="bottom:16px;right:75px" onclick="anneal()">Anneal</button>
+<button class="btn" style="bottom:16px;right:140px" onclick="quench()">Quench</button>
+<button class="btn" style="bottom:16px;right:200px" onclick="melt()">Melt</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="#" onclick="const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','pendulum.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;reset();}
+
+// === STATE ===
+const N=200;
+let particles=[],temperature=.5,targetTemp=.5; // 0=absolute zero, 1=max heat
+let orderScore=0,annealing=false,annealT=0;
+
+function reset(){
+  particles=[];
+  const cols=Math.ceil(Math.sqrt(N*W/H));
+  const rows=Math.ceil(N/cols);
+  for(let i=0;i<N;i++){
+    const col=i%cols,row=Math.floor(i/cols);
+    // Target position (crystal lattice)
+    const tx=W*.1+col/(cols-1)*W*.8;
+    const ty=H*.1+row/(rows-1)*H*.7;
+    // Start scattered
+    particles.push({
+      x:Math.random()*W,y:Math.random()*H,
+      tx:tx,ty:ty, // target lattice position
+      vx:0,vy:0,
+      hue:220+i/N*40,
+    });
+  }
+}
+resize();addEventListener('resize',resize);
+
+// === CONTROLS ===
+addEventListener('wheel',e=>{e.preventDefault();
+  targetTemp=Math.max(0,Math.min(1,targetTemp+(e.deltaY>0?.03:-.03)));
+},{passive:false});
+addEventListener('keydown',e=>{
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key===' '){e.preventDefault();anneal();}
+  if(e.key==='q')quench();
+  if(e.key==='m')melt();
+  if(e.key==='r')reset();
+});
+
+// Click temp bar to set temperature
+document.getElementById('temp-bar').addEventListener('click',e=>{
+  const rect=e.target.getBoundingClientRect();
+  targetTemp=1-(e.clientY-rect.top)/rect.height;
+  targetTemp=Math.max(0,Math.min(1,targetTemp));
+});
+
+function anneal(){annealing=true;annealT=1;targetTemp=1;} // Start hot, cool slowly
+function quench(){targetTemp=0;annealing=false;} // Instant freeze
+function melt(){targetTemp=1;annealing=false;} // Max heat
+
+// === PHYSICS ===
+function update(){
+  // Smooth temperature transition
+  temperature+=(targetTemp-temperature)*.02;
+  // Annealing — slow cooling
+  if(annealing){
+    annealT-=.001;targetTemp=Math.max(0,annealT);
+    if(annealT<=0)annealing=false;
+  }
+
+  let totalDist=0;
+  for(const p of particles){
+    // Thermal noise
+    p.vx+=(Math.random()-.5)*temperature*2;
+    p.vy+=(Math.random()-.5)*temperature*2;
+
+    // Spring force toward lattice position (stronger at low temp)
+    const springK=.01*(1-temperature*.8);
+    p.vx+=(p.tx-p.x)*springK;
+    p.vy+=(p.ty-p.y)*springK;
+
+    // Neighbor repulsion (prevents overlap)
+    for(const q of particles){
+      if(q===p)continue;
+      const dx=q.x-p.x,dy=q.y-p.y;
+      const d2=dx*dx+dy*dy;
+      if(d2<400&&d2>0){const d=Math.sqrt(d2);p.vx-=dx/d*.3;p.vy-=dy/d*.3;}
+    }
+
+    // Damping — more at low temp (viscosity)
+    const damping=.92-temperature*.1;
+    p.vx*=damping;p.vy*=damping;
+
+    p.x+=p.vx;p.y+=p.vy;
+
+    // Soft bounds
+    if(p.x<20){p.vx+=.2;p.x=20;}if(p.x>W-20){p.vx-=.2;p.x=W-20;}
+    if(p.y<40){p.vy+=.2;p.y=40;}if(p.y>H-50){p.vy-=.2;p.y=H-50;}
+
+    totalDist+=Math.sqrt((p.x-p.tx)**2+(p.y-p.ty)**2);
+  }
+  orderScore=1-Math.min(1,totalDist/(N*200));
+}
+
+// === RENDER ===
+function anim(){requestAnimationFrame(anim);
+  update();
+
+  // Background — warmer with temperature
+  const bgR=3+temperature*10,bgG=3+temperature*3,bgB=8-temperature*4;
+  X.fillStyle='rgba('+bgR+','+bgG+','+bgB+',.1)';X.fillRect(0,0,W,H);
+
+  // Lattice ghost (target positions)
+  if(temperature<.5){
+    for(const p of particles){
+      X.globalAlpha=.02*(1-temperature*2);X.fillStyle='rgba(100,150,255,.3)';
+      X.beginPath();X.arc(p.tx,p.ty,2,0,Math.PI*2);X.fill();
+    }
+  }
+
+  // Connections between nearby particles (crystal bonds)
+  if(temperature<.3){
+    for(let i=0;i<particles.length;i++){
+      for(let j=i+1;j<particles.length;j++){
+        const dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if(d<50){
+          X.globalAlpha=.03*(1-temperature/.3)*(1-d/50);
+          X.strokeStyle='rgba(100,170,255,.5)';X.lineWidth=.5;
+          X.beginPath();X.moveTo(particles[i].x,particles[i].y);X.lineTo(particles[j].x,particles[j].y);X.stroke();
+        }
+      }
+    }
+  }
+
+  // Particles
+  for(const p of particles){
+    const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
+    const dist=Math.sqrt((p.x-p.tx)**2+(p.y-p.ty)**2);
+    const settled=dist<15;
+    // Color: blue when ordered, red when chaotic
+    const hue=settled&&temperature<.3?220:220-Math.min(220,spd*30+temperature*180);
+    const sz=2+temperature*2+spd*.3;
+    // Glow
+    X.globalAlpha=.03+spd*.02;X.fillStyle='hsl('+hue+',60%,50%)';
+    X.beginPath();X.arc(p.x,p.y,sz*3,0,Math.PI*2);X.fill();
+    // Core
+    X.globalAlpha=.3+settled*.3;X.fillStyle='hsl('+hue+',50%,60%)';
+    X.beginPath();X.arc(p.x,p.y,sz,0,Math.PI*2);X.fill();
+  }
+
+  // Temperature bar
+  const fill=document.getElementById('temp-fill');
+  fill.style.height=(temperature*100)+'%';
+  fill.style.background='linear-gradient(to top,#4488ff,#ff4444)';
+
+  // State label
+  const state=temperature<.05?'CRYSTAL':temperature<.2?'SOLID':temperature<.5?'VISCOUS':temperature<.8?'LIQUID':'PLASMA';
+  document.getElementById('state').textContent=state;
+  document.getElementById('state').style.color=temperature<.2?'rgba(100,170,255,.3)':temperature>.7?'rgba(255,100,80,.3)':'rgba(255,200,100,.2)';
+
+  X.globalAlpha=1;
+  document.getElementById('stats').textContent=
+    'temp: '+(temperature*1000|0)+' K\norder: '+(orderScore*100|0)+'%\n'+state.toLowerCase()+(annealing?' \u00b7 annealing...':'');
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="order.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
