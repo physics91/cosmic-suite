@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reaction</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='6' fill='%23224' stroke='%23fff' stroke-width='.3' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #preset-name{position:fixed;top:36px;left:50%;transform:translateX(-50%);color:rgba(255,200,150,.2);font-size:12px;letter-spacing:4px;z-index:2;pointer-events:none}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">CLICK TO SEED &middot; SCROLL TO CHANGE PRESET &middot; DRAG TO PAINT</div>
+<div id="preset-name">CORAL</div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="reset()">Reset</button>
+<button class="btn" style="bottom:16px;right:75px" onclick="nextPreset()">Next</button>
+<button class="btn" style="bottom:16px;right:125px" onclick="seedRandom()">Seed</button>
+<button class="btn" style="bottom:16px;right:180px" onclick="seedCenter()">Center</button>
+<button class="btn" style="bottom:16px;right:245px" onclick="cycleColor()">Color: <span id="colName">Thermal</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+const RES=2;
+let cols,rows,gridA,gridB;
+
+function resize(){
+  W=C.width=innerWidth;H=C.height=innerHeight;
+  cols=Math.ceil(W/RES);rows=Math.ceil(H/RES);
+  reset();
+}
+
+function reset(){
+  gridA=new Float32Array(cols*rows).fill(1);
+  gridB=new Float32Array(cols*rows).fill(0);
+}
+
+resize();addEventListener('resize',resize);
+
+// === GRAY-SCOTT REACTION-DIFFUSION ===
+// dA/dt = Da * laplacian(A) - A*B^2 + f*(1-A)
+// dB/dt = Db * laplacian(B) + A*B^2 - (k+f)*B
+
+const PRESETS=[
+  {name:'CORAL',f:.0545,k:.062,Da:1,Db:.5},
+  {name:'MITOSIS',f:.0367,k:.0649,Da:1,Db:.5},
+  {name:'MAZE',f:.029,k:.057,Da:1,Db:.5},
+  {name:'SPOTS',f:.03,k:.063,Da:1,Db:.5},
+  {name:'WORMS',f:.058,k:.065,Da:1,Db:.5},
+  {name:'BUBBLES',f:.012,k:.05,Da:1,Db:.5},
+  {name:'WAVES',f:.014,k:.054,Da:1,Db:.5},
+  {name:'CHAOS',f:.026,k:.051,Da:1,Db:.5},
+];
+let presetIdx=0;
+let f=PRESETS[0].f,k=PRESETS[0].k,Da=1,Db=.5;
+
+function nextPreset(){
+  presetIdx=(presetIdx+1)%PRESETS.length;
+  const p=PRESETS[presetIdx];
+  f=p.f;k=p.k;Da=p.Da;Db=p.Db;
+  document.getElementById('preset-name').textContent=p.name;
+  reset();seedCenter();
+}
+
+// Color schemes
+const COLORS=[
+  {name:'Thermal',fn:(a,b)=>{const v=b*3;return[Math.min(255,v*300),Math.min(255,v*150),Math.min(255,80+v*100)];}},
+  {name:'Ocean',fn:(a,b)=>{const v=b*3;return[Math.min(255,10+v*50),Math.min(255,20+v*150),Math.min(255,40+v*255)];}},
+  {name:'Neon',fn:(a,b)=>{const v=b*4;return[Math.min(255,v*255),Math.min(255,v*100+50),Math.min(255,200-v*100)];}},
+  {name:'Mono',fn:(a,b)=>{const v=Math.min(255,b*600);return[v,v,v];}},
+  {name:'Bio',fn:(a,b)=>{const v=b*4;return[Math.min(255,20+v*30),Math.min(255,40+v*200),Math.min(255,20+v*60)];}},
+];
+let colorIdx=0;
+function cycleColor(){colorIdx=(colorIdx+1)%COLORS.length;document.getElementById('colName').textContent=COLORS[colorIdx].name;}
+
+// === SEEDING ===
+function seedAt(cx,cy,radius){
+  for(let y=cy-radius;y<=cy+radius;y++){
+    for(let x=cx-radius;x<=cx+radius;x++){
+      const dx=x-cx,dy=y-cy;
+      if(dx*dx+dy*dy<radius*radius){
+        const wx=((x%cols)+cols)%cols;
+        const wy=((y%rows)+rows)%rows;
+        gridB[wy*cols+wx]=1;
+      }
+    }
+  }
+}
+
+function seedCenter(){
+  const cx=cols/2|0,cy=rows/2|0;
+  seedAt(cx,cy,Math.min(cols,rows)*.05|0);
+}
+
+function seedRandom(){
+  for(let i=0;i<15;i++){
+    seedAt(Math.random()*cols|0,Math.random()*rows|0,3+Math.random()*8|0);
+  }
+}
+
+// Initial seed
+seedCenter();
+
+// === INPUT ===
+let painting=false;
+C.addEventListener('mousedown',e=>{painting=true;seedAt(Math.floor(e.clientX/RES),Math.floor(e.clientY/RES),5);});
+C.addEventListener('mousemove',e=>{if(painting)seedAt(Math.floor(e.clientX/RES),Math.floor(e.clientY/RES),3);});
+addEventListener('mouseup',()=>{painting=false;});
+C.addEventListener('touchstart',e=>{e.preventDefault();painting=true;seedAt(Math.floor(e.touches[0].clientX/RES),Math.floor(e.touches[0].clientY/RES),5);},{passive:false});
+C.addEventListener('touchmove',e=>{e.preventDefault();if(painting)seedAt(Math.floor(e.touches[0].clientX/RES),Math.floor(e.touches[0].clientY/RES),3);},{passive:false});
+C.addEventListener('touchend',()=>{painting=false;});
+addEventListener('wheel',e=>{e.preventDefault();nextPreset();},{passive:false});
+addEventListener('keydown',e=>{
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='r')reset();
+  if(e.key==='s'){reset();seedRandom();}
+  if(e.key===' '){e.preventDefault();nextPreset();}
+});
+
+// === SIMULATION ===
+let stepCount=0;
+function simulate(){
+  const nextA=new Float32Array(cols*rows);
+  const nextB=new Float32Array(cols*rows);
+
+  for(let y=1;y<rows-1;y++){
+    for(let x=1;x<cols-1;x++){
+      const i=y*cols+x;
+      const a=gridA[i],b=gridB[i];
+      // Laplacian (5-point stencil)
+      const lapA=gridA[i-1]+gridA[i+1]+gridA[i-cols]+gridA[i+cols]-4*a;
+      const lapB=gridB[i-1]+gridB[i+1]+gridB[i-cols]+gridB[i+cols]-4*b;
+      const ab2=a*b*b;
+      nextA[i]=a+Da*lapA-ab2+f*(1-a);
+      nextB[i]=b+Db*lapB+ab2-(k+f)*b;
+      // Clamp
+      if(nextA[i]<0)nextA[i]=0;if(nextA[i]>1)nextA[i]=1;
+      if(nextB[i]<0)nextB[i]=0;if(nextB[i]>1)nextB[i]=1;
+    }
+  }
+  gridA=nextA;gridB=nextB;stepCount++;
+}
+
+// === RENDER ===
+let imgData=null;
+const offC=document.createElement('canvas');
+const offX=offC.getContext('2d');
+
+function render(){
+  offC.width=cols;offC.height=rows;
+  if(!imgData||imgData.width!==cols)imgData=new ImageData(cols,rows);
+  const d=imgData.data;
+  const colorFn=COLORS[colorIdx].fn;
+
+  for(let i=0;i<cols*rows;i++){
+    const pi=i*4;
+    const [r,g,b]=colorFn(gridA[i],gridB[i]);
+    d[pi]=r;d[pi+1]=g;d[pi+2]=b;d[pi+3]=255;
+  }
+
+  offX.putImageData(imgData,0,0);
+  X.imageSmoothingEnabled=true;
+  X.drawImage(offC,0,0,cols,rows,0,0,W,H);
+
+  document.getElementById('stats').textContent=
+    'step: '+stepCount+'\nf: '+f.toFixed(4)+' k: '+k.toFixed(4)+'\nres: '+cols+'x'+rows;
+}
+
+function anim(){
+  requestAnimationFrame(anim);
+  // Multiple steps per frame for speed
+  for(let i=0;i<8;i++)simulate();
+  render();
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="reaction.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
