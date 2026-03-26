@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oracle</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><text x='16' y='22' text-anchor='middle' fill='%23cc88ff' font-size='16' opacity='.5'>&#x2736;</text></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#060610;overflow-x:hidden;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center}
+    canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+    .content{position:relative;z-index:1;max-width:600px;width:100%;padding:30px 20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+    h1{color:rgba(255,255,255,.2);font-weight:100;font-size:16px;letter-spacing:8px;margin-bottom:8px}
+    .sub{color:rgba(255,255,255,.08);font-size:9px;letter-spacing:3px;margin-bottom:30px}
+    #input-area{width:100%;max-width:500px;position:relative;margin-bottom:30px}
+    #input-area textarea{width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.7);padding:16px 20px;border-radius:16px;font-size:14px;outline:none;letter-spacing:.5px;resize:none;height:80px;font-family:inherit;line-height:1.6}
+    #input-area textarea::placeholder{color:rgba(255,255,255,.12)}
+    #ask-btn{position:absolute;right:12px;bottom:12px;background:rgba(200,136,255,.1);border:1px solid rgba(200,136,255,.2);color:rgba(200,136,255,.6);padding:6px 16px;border-radius:10px;cursor:pointer;font-size:10px;letter-spacing:2px}
+    #ask-btn:hover{background:rgba(200,136,255,.2);color:rgba(200,136,255,.9)}
+    #card-area{display:flex;gap:16px;justify-content:center;margin:20px 0;min-height:200px;align-items:center}
+    .card{width:120px;height:180px;border-radius:12px;position:relative;transition:all .8s;transform-style:preserve-3d;cursor:default;opacity:0;transform:scale(.5) rotateY(0deg)}
+    .card.reveal{opacity:1;transform:scale(1) rotateY(180deg)}
+    .card-face{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:12px;backface-visibility:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}
+    .card-back{background:linear-gradient(135deg,rgba(40,20,80,.9),rgba(20,10,50,.9));border:1px solid rgba(200,136,255,.15)}
+    .card-back .pattern{color:rgba(200,136,255,.15);font-size:36px}
+    .card-front{background:linear-gradient(135deg,rgba(10,10,30,.95),rgba(25,15,50,.95));border:1px solid rgba(200,136,255,.25);transform:rotateY(180deg)}
+    .card-front .symbol{font-size:40px;margin-bottom:6px}
+    .card-front .name{color:rgba(200,136,255,.7);font-size:10px;letter-spacing:2px;margin-bottom:4px}
+    .card-front .pos{color:rgba(255,255,255,.15);font-size:8px;letter-spacing:2px}
+    #reading{color:rgba(255,255,255,.3);font-size:12px;line-height:2;max-width:500px;text-align:center;margin:20px auto;min-height:60px;font-style:italic}
+    #insight{color:rgba(200,136,255,.2);font-size:9px;letter-spacing:1px;text-align:center;margin-top:8px;max-width:400px}
+    #typing-mood{color:rgba(255,200,100,.15);font-size:8px;letter-spacing:2px;margin-top:4px}
+    .history-item{color:rgba(255,255,255,.1);font-size:9px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.03);text-align:center;max-width:400px}
+    .history-item .q{color:rgba(255,255,255,.2)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="content">
+  <h1>ORACLE</h1>
+  <div class="sub">ask the cosmos &middot; it reads your soul</div>
+  <div id="input-area">
+    <textarea id="question" placeholder="Ask the universe anything..."></textarea>
+    <button id="ask-btn" onclick="askOracle()">DIVINE</button>
+  </div>
+  <div id="card-area"></div>
+  <div id="reading"></div>
+  <div id="insight"></div>
+  <div id="typing-mood"></div>
+  <div id="history"></div>
+</div>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const CV=document.getElementById('c'),CX=CV.getContext('2d');
+let W,H;function resize(){W=CV.width=innerWidth;H=CV.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// === CARDS ===
+const CARDS=[
+  {symbol:'\u2600',name:'THE STAR',msgs:['Hope illuminates your path.','A new beginning burns bright.','The universe conspires in your favor.']},
+  {symbol:'\ud83c\udf19',name:'THE MOON',msgs:['Trust your intuition.','Something hidden will be revealed.','The unconscious speaks.']},
+  {symbol:'\u26a1',name:'THE BOLT',msgs:['Sudden change approaches.','Destruction clears space for creation.','Embrace the unexpected.']},
+  {symbol:'\ud83c\udf0a',name:'THE TIDE',msgs:['Go with the flow.','Emotions run deep \u2014 let them.','What ebbs will return.']},
+  {symbol:'\ud83d\udd25',name:'THE FLAME',msgs:['Passion ignites within you.','Transform what no longer serves.','Your energy is your gift.']},
+  {symbol:'\ud83d\udc8e',name:'THE CRYSTAL',msgs:['Clarity comes through stillness.','The answer is already within.','Patience reveals what rushing conceals.']},
+  {symbol:'\ud83c\udf00',name:'THE SPIRAL',msgs:['Growth is never linear.','You are exactly where you need to be.','The pattern repeats at a higher level.']},
+  {symbol:'\ud83d\udd73',name:'THE VOID',msgs:['In emptiness, find potential.','Release attachment to outcome.','The void is everything waiting.']},
+  {symbol:'\ud83c\udf31',name:'THE SEED',msgs:['Something new is germinating.','Plant intentions, not expectations.','Small beginnings, vast forests.']},
+  {symbol:'\u2696',name:'THE BALANCE',msgs:['Harmony requires both sides.','Neither too much nor too little.','Find the center.']},
+  {symbol:'\ud83e\ude9e',name:'THE MIRROR',msgs:['What you see in others exists in you.','Self-reflection precedes self-knowledge.','The universe reflects your state.']},
+  {symbol:'\u221e',name:'THE INFINITE',msgs:['No endings, only transitions.','You are part of something larger.','Every moment contains eternity.']},
+  {symbol:'\ud83d\udddd',name:'THE KEY',msgs:['The door you seek is already open.','Knowledge unlocks fear.','You hold the answer.']},
+  {symbol:'\ud83e\udd8b',name:'THE CHANGE',msgs:['Metamorphosis is underway.','Let go of who you were.','Beauty emerges from surrender.']},
+  {symbol:'\u2b50',name:'THE GUIDE',msgs:['Follow what makes you feel alive.','A mentor appears when ready.','Your north star knows the way.']},
+];
+
+// === TYPING TRACKER ===
+const tracker={keys:[],backspaces:0,pauses:[],startTime:0,capsCount:0};
+const ta=document.getElementById('question');
+
+ta.addEventListener('keydown',e=>{
+  const now=Date.now();
+  if(!tracker.startTime)tracker.startTime=now;
+  if(e.key==='Backspace')tracker.backspaces++;
+  else if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();askOracle();}
+  else if(e.key.length===1){
+    if(tracker.keys.length>0)tracker.pauses.push(now-tracker.keys[tracker.keys.length-1]);
+    tracker.keys.push(now);
+    if(e.key>='A'&&e.key<='Z')tracker.capsCount++;
+  }
+});
+
+function analyzeTyping(text){
+  const pauses=tracker.pauses.filter(p=>p>0);
+  const avgPause=pauses.length?pauses.reduce((a,b)=>a+b,0)/pauses.length:500;
+  const speed=tracker.keys.length?60000/avgPause:0;
+  const hesitation=tracker.backspaces/(tracker.keys.length||1);
+  const longestPause=pauses.length?Math.max(...pauses):0;
+  return{speed,hesitation,longestPause,caps:tracker.capsCount/(text.length||1),wordCount:text.trim().split(/\s+/).length};
+}
+
+function detectMood(a){
+  if(a.speed>250)return{mood:'urgent',desc:'Your fingers burned with urgency'};
+  if(a.hesitation>.25)return{mood:'uncertain',desc:'You erased yourself many times \u2014 the real question hides in what you deleted'};
+  if(a.longestPause>3000)return{mood:'wrestling',desc:'That long silence in the middle... you almost asked something else'};
+  if(a.caps>.3&&a.wordCount>2)return{mood:'intense',desc:'You shouted at the void. The void heard you'};
+  if(a.wordCount<=2)return{mood:'guarded',desc:'So few words. You guard your true question closely'};
+  if(a.wordCount>15)return{mood:'overflowing',desc:'Words poured out of you. You have been holding this'};
+  if(a.speed<80)return{mood:'contemplative',desc:'Each letter was placed with care, like a prayer'};
+  return{mood:'seeking',desc:'You came with a question shaped like hope'};
+}
+
+// === CARD SELECTION (influenced by typing + content) ===
+function selectCards(text,mood){
+  // Hash text to seed selection (deterministic per question)
+  let hash=0;
+  for(let i=0;i<text.length;i++)hash=((hash<<5)-hash)+text.charCodeAt(i)|0;
+  // Mood shifts the seed
+  const moodShift={urgent:7,uncertain:3,wrestling:11,intense:5,guarded:13,overflowing:2,contemplative:9,seeking:0};
+  hash+=moodShift[mood.mood]||0;
+  // Select 3 unique cards
+  const selected=[];const used=new Set();
+  for(let i=0;i<3;i++){
+    let idx=Math.abs((hash*31+i*137)%CARDS.length);
+    while(used.has(idx))idx=(idx+1)%CARDS.length;
+    used.add(idx);
+    selected.push(CARDS[idx]);
+  }
+  return selected;
+}
+
+// === READING GENERATION ===
+function generateReading(cards,mood,text){
+  const positions=['What was','What is','What comes'];
+  const parts=cards.map((c,i)=>{
+    const msg=c.msgs[Math.abs(text.charCodeAt(i%text.length||0))%c.msgs.length];
+    return positions[i]+': '+c.name+'. '+msg;
+  });
+  return parts.join(' \u2014 ');
+}
+
+// === ASK ===
+let readingCount=0;
+function askOracle(){
+  const text=ta.value.trim();
+  if(!text)return;
+  const analysis=analyzeTyping(text);
+  const mood=detectMood(analysis);
+  const cards=selectCards(text,mood.mood);
+  const reading=generateReading(cards,mood,text);
+
+  // Reset tracker
+  tracker.keys=[];tracker.backspaces=0;tracker.pauses=[];tracker.startTime=0;tracker.capsCount=0;
+  ta.value='';readingCount++;
+
+  // Render cards
+  const area=document.getElementById('card-area');
+  area.replaceChildren();
+  const positions=['PAST','PRESENT','FUTURE'];
+  cards.forEach((card,i)=>{
+    const div=document.createElement('div');div.className='card';
+    const back=document.createElement('div');back.className='card-face card-back';
+    const pat=document.createElement('div');pat.className='pattern';pat.textContent='\u2736';
+    back.appendChild(pat);
+    const front=document.createElement('div');front.className='card-face card-front';
+    const sym=document.createElement('div');sym.className='symbol';sym.textContent=card.symbol;
+    const name=document.createElement('div');name.className='name';name.textContent=card.name;
+    const pos=document.createElement('div');pos.className='pos';pos.textContent=positions[i];
+    front.appendChild(sym);front.appendChild(name);front.appendChild(pos);
+    div.appendChild(back);div.appendChild(front);
+    area.appendChild(div);
+    // Staggered reveal
+    setTimeout(()=>div.classList.add('reveal'),300+i*400);
+  });
+
+  // Show reading after cards flip
+  setTimeout(()=>{
+    const el=document.getElementById('reading');el.textContent='';
+    let ci=0;
+    const typeWriter=()=>{if(ci<reading.length){el.textContent+=reading[ci];ci++;setTimeout(typeWriter,20+Math.random()*20);}};
+    typeWriter();
+  },300+3*400+200);
+
+  // Typing insight
+  setTimeout(()=>{
+    document.getElementById('insight').textContent='\u27e1 '+mood.desc;
+    document.getElementById('typing-mood').textContent='mood: '+mood.mood+' \u00b7 speed: '+Math.round(analysis.speed)+' cpm \u00b7 hesitation: '+Math.round(analysis.hesitation*100)+'%';
+  },300+3*400+500);
+
+  // Add to history
+  const hist=document.getElementById('history');
+  const item=document.createElement('div');item.className='history-item';
+  const q=document.createElement('div');q.className='q';q.textContent='"'+text+'"';
+  const a=document.createElement('div');a.textContent=cards.map(c=>c.symbol).join(' ')+' \u2014 '+cards.map(c=>c.name).join(', ');
+  item.appendChild(q);item.appendChild(a);
+  hist.insertBefore(item,hist.firstChild);
+
+  // Sound
+  try{
+    const ac=new(AudioContext||webkitAudioContext)();
+    [300,400,500].forEach((f,i)=>{
+      const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f;
+      g.gain.setValueAtTime(.02,ac.currentTime+i*.3);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+i*.3+.6);
+      o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+i*.3);o.stop(ac.currentTime+i*.3+.7);
+    });
+  }catch(e){}
+}
+
+// === BACKGROUND ===
+const stars=Array.from({length:100},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
+function anim(){requestAnimationFrame(anim);
+  CX.fillStyle='rgba(6,6,16,.04)';CX.fillRect(0,0,W,H);
+  for(const s of stars){s.p+=.003;CX.globalAlpha=.04+Math.sin(s.p)*.02;CX.fillStyle='#fff';
+    CX.beginPath();CX.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);CX.fill();}
+  // Mystical central glow
+  CX.globalAlpha=.02;
+  const g=CX.createRadialGradient(W/2,H*.3,0,W/2,H*.3,200);
+  g.addColorStop(0,'rgba(200,136,255,.15)');g.addColorStop(1,'rgba(0,0,0,0)');
+  CX.fillStyle=g;CX.beginPath();CX.arc(W/2,H*.3,200,0,Math.PI*2);CX.fill();
+  CX.globalAlpha=1;
+}
+anim();
+
+addEventListener('keydown',e=>{if(e.key==='f'&&!e.target.closest('textarea'))document.documentElement.requestFullscreen().catch(()=>{});});
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="oracle.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
