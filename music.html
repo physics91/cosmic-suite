@@ -182,6 +182,8 @@ function anim(){requestAnimationFrame(anim);
     const ph=$('playhead');ph.style.left=(playPos/16*100)+'%';}
   // Stars
   for(const s of stars){s.update();s.draw(X);}
+  // Playhead column highlight
+  if(playing){X.globalAlpha=.03;X.fillStyle='#ffcc44';X.fillRect(playPos*W/16,0,W/16,H);}
   // Scale guide — highlight root note rows
   const curScale=SCALES[$('scaleSelect').value]||SCALES.minor;
   for(let i=0;i<24;i++){if(curScale.includes(i%12)){const ny=H-i*H/24;
