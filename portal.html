@@ -127,6 +127,34 @@ function getEpoch(){
   return'THE OBSERVABLE UNIVERSE';
 }
 
+// === COSMIC ACHIEVEMENTS ===
+const ACHIEVEMENTS=[
+  {id:'first_visit',name:'First Light',desc:'Visit your first experience',check:()=>visitedExps.length>=1},
+  {id:'explorer_5',name:'Explorer',desc:'Visit 5 different experiences',check:()=>visitedExps.length>=5},
+  {id:'explorer_10',name:'Voyager',desc:'Visit 10 different experiences',check:()=>visitedExps.length>=10},
+  {id:'explorer_20',name:'Pioneer',desc:'Visit 20 different experiences',check:()=>visitedExps.length>=20},
+  {id:'all_cats',name:'Renaissance',desc:'Visit all 4 categories',check:()=>{const cats=new Set(visitedExps.map(i=>EXP[i].cat));return cats.size>=4;}},
+  {id:'time_10',name:'Deep Space',desc:'Spend 10 minutes total',check:()=>cosmicMemory.totalTime>=600},
+  {id:'time_60',name:'Time Lord',desc:'Spend 60 minutes total',check:()=>cosmicMemory.totalTime>=3600},
+  {id:'epoch_galaxy',name:'Galaxy Brain',desc:'Reach THE GALAXY epoch',check:()=>universeAge>=7200},
+  {id:'night_owl',name:'Night Owl',desc:'Visit between midnight and 4am',check:()=>{const h=new Date().getHours();return h>=0&&h<4;}},
+  {id:'returner',name:'Eternal Return',desc:'Visit the portal 10 times',check:()=>visits>=10},
+];
+
+const unlockedAch=JSON.parse(localStorage.getItem('suite_achievements')||'[]');
+function checkAchievements(){
+  let newUnlock=false;
+  for(const a of ACHIEVEMENTS){
+    if(unlockedAch.includes(a.id))continue;
+    try{if(a.check()){unlockedAch.push(a.id);newUnlock=true;showAchievement(a);}}catch(e){}
+  }
+  if(newUnlock)localStorage.setItem('suite_achievements',JSON.stringify(unlockedAch));
+}
+let achNotification=null,achTimer=0;
+function showAchievement(a){
+  achNotification=a;achTimer=180; // 3 seconds at 60fps
+}
+
 // === COSMIC PULSE — multi-tab heartbeat via BroadcastChannel ===
 const pulseChannel=new BroadcastChannel('cosmic-pulse');
 const aliveExps={}; // {href: lastPulseTime}
@@ -347,6 +375,20 @@ function anim(){requestAnimationFrame(anim);t+=.01;
   // Epoch indicator
   X.globalAlpha=.06;X.fillStyle='#ffcc88';X.font='8px sans-serif';X.textAlign='center';
   X.fillText('EPOCH: '+getEpoch(),cx,H-24);
+  // Achievement counter
+  X.globalAlpha=.06;X.fillStyle='#ffcc88';X.font='8px sans-serif';
+  X.fillText('\u2605 '+unlockedAch.length+'/'+ACHIEVEMENTS.length+' achievements',cx,H-36);
+  // Check achievements periodically
+  if(Math.floor(t*100)%100===0)checkAchievements();
+  // Achievement notification
+  if(achTimer>0&&achNotification){
+    achTimer--;
+    const fade=achTimer<30?achTimer/30:achTimer>150?(180-achTimer)/30:1;
+    X.globalAlpha=fade*.4;X.fillStyle='#ffcc44';X.font='12px sans-serif';
+    X.fillText('\u2605 '+achNotification.name,cx,80);
+    X.globalAlpha=fade*.2;X.font='9px sans-serif';X.fillStyle='#fff';
+    X.fillText(achNotification.desc,cx,96);
+  }
   // Mini clock
   const now=new Date(),pad=n=>(''+n).padStart(2,'0');
   X.globalAlpha=.06;X.fillStyle='#fff';X.font='10px monospace';X.textAlign='center';
