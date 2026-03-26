@@ -71,6 +71,8 @@ function renderMatrix(){
   el.appendChild(tbl);}
 renderMatrix();
 
+C.addEventListener('click',e=>{if(e.target===C)for(let i=0;i<20;i++){
+  particles.push({x:e.clientX+(Math.random()-.5)*30,y:e.clientY+(Math.random()-.5)*30,vx:(Math.random()-.5)*3,vy:(Math.random()-.5)*3,sp:Math.random()*N|0});}});
 const RADIUS=80,FRICTION=.5,FORCE=.5;
 function update(){
   for(const p of particles){let fx=0,fy=0;
