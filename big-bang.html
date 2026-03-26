@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Big Bang</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;cursor:pointer}
+    canvas{display:block}
+    #msg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.08);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;transition:opacity 2s}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="msg">click to begin</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+let phase=0; // 0=void, 1=bang, 2=expansion, 3=stars, 4=cosmos
+let t=0,bangT=0;
+const particles=[];
+const stars=[];
+
+addEventListener('click',()=>{
+  if(phase===0){phase=1;bangT=0;document.getElementById('msg').style.opacity='0';}
+  else if(phase===4){location.href='portal.html';}
+});
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
+
+function anim(){requestAnimationFrame(anim);t+=.016;
+  const cx=W/2,cy=H/2;
+
+  if(phase===0){
+    // Void — single dot
+    X.fillStyle='#000';X.fillRect(0,0,W,H);
+    const pulse=Math.sin(t*2)*.3+.7;
+    X.globalAlpha=pulse*.15;X.fillStyle='#fff';
+    X.beginPath();X.arc(cx,cy,2,0,Math.PI*2);X.fill();
+    X.globalAlpha=1;
+  }
+  else if(phase===1){
+    // Big Bang — flash and explosion
+    bangT+=.016;
+    if(bangT<.3){
+      // White flash
+      X.globalAlpha=1-bangT/.3;X.fillStyle='#fff';X.fillRect(0,0,W,H);
+    }else if(bangT<2){
+      // Expanding ring of creation
+      X.fillStyle='rgba(0,0,0,.05)';X.fillRect(0,0,W,H);
+      const expand=(bangT-.3)/1.7;
+      const r=expand*Math.max(W,H)*.6;
+      // Ring
+      X.globalAlpha=.2*(1-expand);X.strokeStyle='#ffcc44';X.lineWidth=3+expand*10;
+      X.beginPath();X.arc(cx,cy,r,0,Math.PI*2);X.stroke();
+      // Spawn particles
+      if(particles.length<500){
+        for(let i=0;i<5;i++){
+          const a=Math.random()*Math.PI*2;
+          const spd=2+Math.random()*4;
+          particles.push({x:cx,y:cy,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,
+            life:100+Math.random()*200,hue:Math.random()*360,sz:1+Math.random()*2});
+        }
+      }
+    }else{phase=2;}
+    // Sound
+    if(bangT<.05){
+      try{const a=new(AudioContext||webkitAudioContext)();
+        [100,200,300,400].forEach((f,i)=>{const o=a.createOscillator(),g=a.createGain();
+          o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(.02,a.currentTime);
+          g.gain.exponentialRampToValueAtTime(.001,a.currentTime+2);
+          o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+2);});}catch(e){}
+    }
+  }
+  else if(phase===2){
+    // Expansion — particles fly outward, cooling
+    X.fillStyle='rgba(0,0,0,.03)';X.fillRect(0,0,W,H);
+    bangT+=.016;
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.x+=p.vx;p.y+=p.vy;p.vx*=.998;p.vy*=.998;p.life--;
+      if(p.life<=0){
+        // Become a permanent star
+        stars.push({x:p.x,y:p.y,s:p.sz*.5,hue:p.hue,p:Math.random()*Math.PI*2});
+        particles.splice(i,1);continue;
+      }
+      X.globalAlpha=Math.min(.5,p.life/100);
+      X.fillStyle='hsl('+p.hue+',60%,60%)';
+      X.beginPath();X.arc(p.x,p.y,p.sz,0,Math.PI*2);X.fill();
+    }
+    if(particles.length===0&&bangT>5)phase=3;
+  }
+  else if(phase===3){
+    // Stars settle — cosmos forms
+    X.fillStyle='rgba(0,0,0,.02)';X.fillRect(0,0,W,H);
+    bangT+=.016;
+    for(const s of stars){
+      s.p+=.003;
+      X.globalAlpha=.05+Math.sin(s.p)*.03;X.fillStyle='hsl('+s.hue+',30%,70%)';
+      X.beginPath();X.arc(s.x,s.y,s.s,0,Math.PI*2);X.fill();
+    }
+    if(bangT>8){phase=4;}
+    // Fade in message
+    if(bangT>6){
+      const fade=Math.min(1,(bangT-6)/2);
+      X.globalAlpha=fade*.15;X.fillStyle='#fff';X.font='14px sans-serif';X.textAlign='center';
+      X.fillText('From nothing, everything.',cx,cy);
+      X.globalAlpha=fade*.06;X.font='9px sans-serif';
+      X.fillText('click to enter the cosmic suite',cx,cy+25);
+    }
+  }
+  else if(phase===4){
+    // Cosmos — living universe
+    X.fillStyle='rgba(0,0,0,.015)';X.fillRect(0,0,W,H);
+    for(const s of stars){
+      s.p+=.003;
+      X.globalAlpha=.06+Math.sin(s.p)*.03;X.fillStyle='hsl('+s.hue+',30%,70%)';
+      X.beginPath();X.arc(s.x,s.y,s.s,0,Math.PI*2);X.fill();
+    }
+    X.globalAlpha=.15+Math.sin(t)*.05;X.fillStyle='#fff';X.font='14px sans-serif';X.textAlign='center';
+    X.fillText('From nothing, everything.',cx,cy);
+    X.globalAlpha=.06;X.font='9px sans-serif';
+    X.fillText('click to enter',cx,cy+25);
+  }
+
+  X.globalAlpha=1;
+}
+anim();
+</script>
+</body>
+</html>
