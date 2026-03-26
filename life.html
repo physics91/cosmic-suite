@@ -27,6 +27,7 @@
   <button class="btn" onclick="preset('cells')">Cells</button>
   <button class="btn" onclick="preset('chase')">Chase</button>
   <button class="btn" onclick="preset('swarm')">Swarm</button>
+  <button class="btn" onclick="preset('bounce')">Bounce</button>
   <button class="btn" onclick="reset()">Reset</button>
   <button class="btn" id="shBtn" onclick="toggleShuffle()">Auto Shuffle</button>
   <button class="btn" onclick="const l=document.createElement('a');l.download='life_'+Date.now()+'.png';l.href=C.toDataURL();l.click()">Save PNG</button>
@@ -52,6 +53,7 @@ function preset(name){
   if(name==='cells')rules=[[1,-.5,-.5,.2],[-.5,1,-.5,.2],[-.5,-.5,1,.2],[.2,.2,.2,-.3]];
   else if(name==='chase')rules=[[0,1,-.5,0],[-1,0,1,0],[.5,-1,0,0],[0,0,0,0]];
   else if(name==='swarm')rules=[[.3,.1,.1,.1],[.1,.3,.1,.1],[.1,.1,.3,.1],[.1,.1,.1,.3]];
+  else if(name==='bounce')rules=[[-1,1,-1,1],[1,-1,1,-1],[-1,1,-1,1],[1,-1,1,-1]];
   renderMatrix();}
 function randomize(){rules=Array.from({length:N},()=>Array.from({length:N},()=>+((Math.random()-.5)*2).toFixed(1)));renderMatrix();}
 function reset(){createParticles();}
