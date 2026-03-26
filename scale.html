@@ -24,7 +24,7 @@
 <div id="label"><h1 id="name">HUMAN</h1><div class="sz" id="size">~1.7 m</div><div class="desc" id="desc">You are here. Everything else is relative to you.</div></div>
 <div id="scaleBar"><div id="scalePos"></div></div>
 <div id="power">10<sup>0</sup> m</div>
-<div id="hint">SCROLL TO ZOOM THROUGH 40 ORDERS OF MAGNITUDE</div>
+<div id="hint">SCROLL TO ZOOM · <span onclick="targetPower=OBJECTS[Math.random()*OBJECTS.length|0][0]" style="cursor:pointer;text-decoration:underline">RANDOM JUMP</span></div>
 <script>
 const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
