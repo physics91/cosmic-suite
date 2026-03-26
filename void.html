@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Void</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;cursor:default}
+    canvas{display:block}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.05);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr;</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+let breathing=false,t=0;
+
+addEventListener('click',()=>{breathing=true;});
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
+
+function anim(){requestAnimationFrame(anim);t+=.01;
+  X.fillStyle='rgba(0,0,0,.03)';X.fillRect(0,0,W,H);
+
+  const cx=W/2,cy=H/2;
+  const breath=breathing?Math.sin(t*.5)*.5+.5:0;
+  const r=2+breath*3;
+
+  // One dot
+  X.globalAlpha=.1+breath*.2;X.fillStyle='#fff';
+  X.beginPath();X.arc(cx,cy,r,0,Math.PI*2);X.fill();
+
+  // Faintest possible glow
+  if(breathing){
+    X.globalAlpha=breath*.02;
+    X.beginPath();X.arc(cx,cy,r*10+breath*20,0,Math.PI*2);X.fill();
+  }
+
+  X.globalAlpha=1;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="void.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
