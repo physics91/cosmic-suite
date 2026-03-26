@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tree</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#040408;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:pointer}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.1);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">CLICK TO GROW A NEW TREE &middot; SCROLL TO CHANGE WIND</div>
+<button class="btn" style="bottom:16px;right:16px" onclick="grow()">New Tree</button>
+<button class="btn" style="bottom:16px;right:95px" onclick="cycleSeason()">Season: <span id="sV">Spring</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.05);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+
+const SEASONS=[
+  {name:'Spring',leaf:'#88cc44',trunk:'#553322',bg:[4,6,4],leafDrop:0},
+  {name:'Summer',leaf:'#44aa22',trunk:'#664433',bg:[4,8,4],leafDrop:0},
+  {name:'Autumn',leaf:'#dd8822',trunk:'#553322',bg:[8,5,3],leafDrop:.02},
+  {name:'Winter',leaf:null,trunk:'#443333',bg:[4,4,8],leafDrop:0},
+];
+let seasonIdx=0,wind=0,time=0;
+let fallingLeaves=[];
+
+function cycleSeason(){seasonIdx=(seasonIdx+1)%SEASONS.length;document.getElementById('sV').textContent=SEASONS[seasonIdx].name;grow();}
+
+addEventListener('wheel',e=>{e.preventDefault();wind+=(e.deltaY>0?.02:-.02);wind=Math.max(-.3,Math.min(.3,wind));},{passive:false});
+addEventListener('click',e=>{if(e.target.closest('.btn'))return;grow();});
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
+
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;grow();}
+resize();addEventListener('resize',resize);
+
+function grow(){
+  fallingLeaves=[];
+  X.fillStyle='rgb('+SEASONS[seasonIdx].bg.join(',')+')';X.fillRect(0,0,W,H);
+  drawTree(W/2,H-20,-Math.PI/2,H*.2,8,0);
+}
+
+function drawTree(x,y,angle,len,thick,depth){
+  if(depth>12||len<3)return;
+  const season=SEASONS[seasonIdx];
+  const windBend=wind*depth*.15;
+  const endX=x+Math.cos(angle+windBend)*len;
+  const endY=y+Math.sin(angle+windBend)*len;
+
+  // Trunk/branch
+  X.strokeStyle=season.trunk;
+  X.lineWidth=thick;X.lineCap='round';
+  X.globalAlpha=.3+thick/16*.4;
+  X.beginPath();X.moveTo(x,y);X.lineTo(endX,endY);X.stroke();
+
+  // Leaves at tips
+  if(depth>6&&season.leaf){
+    X.globalAlpha=.15+Math.random()*.1;X.fillStyle=season.leaf;
+    const lsz=3+Math.random()*4;
+    X.beginPath();X.arc(endX+(Math.random()-.5)*5,endY+(Math.random()-.5)*5,lsz,0,Math.PI*2);X.fill();
+    // Register for potential falling
+    if(season.leafDrop>0&&Math.random()<season.leafDrop){
+      fallingLeaves.push({x:endX,y:endY,vx:(Math.random()-.5),vy:0,sz:lsz,hue:20+Math.random()*30,life:200});
+    }
+  }
+
+  // Branch
+  const shrink=.65+Math.random()*.1;
+  const spread=.3+Math.random()*.3;
+  const jitter=(Math.random()-.5)*.2;
+  drawTree(endX,endY,angle-spread+jitter,len*shrink,thick*.7,depth+1);
+  drawTree(endX,endY,angle+spread+jitter,len*shrink,thick*.7,depth+1);
+  if(depth<4&&Math.random()<.3){
+    drawTree(endX,endY,angle+jitter,len*shrink*.8,thick*.5,depth+1);
+  }
+}
+
+grow();
+
+// Ground
+function drawGround(){
+  X.globalAlpha=.03;X.fillStyle='#442211';
+  X.fillRect(0,H-20,W,20);
+}
+
+function anim(){requestAnimationFrame(anim);time+=.016;
+
+  // Subtle background fade
+  const bg=SEASONS[seasonIdx].bg;
+  X.fillStyle='rgba('+bg[0]+','+bg[1]+','+bg[2]+',.01)';X.fillRect(0,0,W,H);
+
+  // Falling leaves (autumn)
+  for(let i=fallingLeaves.length-1;i>=0;i--){
+    const l=fallingLeaves[i];
+    l.vy+=.02;l.vx+=wind*.1+(Math.random()-.5)*.05;l.vx*=.99;
+    l.x+=l.vx;l.y+=l.vy;l.life--;
+    if(l.life<=0||l.y>H){fallingLeaves.splice(i,1);continue;}
+    X.globalAlpha=(l.life/200)*.3;X.fillStyle='hsl('+l.hue+',70%,50%)';
+    X.beginPath();X.arc(l.x,l.y,l.sz*(l.life/200),0,Math.PI*2);X.fill();
+  }
+
+  // Re-draw tree very faintly to maintain it (fights fade)
+  if(time%2<.016)grow();
+
+  X.globalAlpha=1;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="tree.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
