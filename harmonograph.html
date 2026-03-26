@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Harmonograph</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><ellipse cx='16' cy='16' rx='8' ry='5' fill='none' stroke='%23ffcc88' stroke-width='.6' opacity='.4' transform='rotate(20 16 16)'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#040408;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #params{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:10;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+    #params label{color:rgba(255,255,255,.2);font-size:8px;display:flex;gap:4px;align-items:center;letter-spacing:1px}
+    #params input{width:80px;accent-color:#ffcc88}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">HARMONOGRAPH &middot; TWO PENDULUMS DRAWING IN TIME</div>
+<div id="params">
+  <label>freq X <input type="range" id="fx" min="1" max="12" value="3" step=".1"><span id="fxV">3</span></label>
+  <label>freq Y <input type="range" id="fy" min="1" max="12" value="2" step=".1"><span id="fyV">2</span></label>
+  <label>phase <input type="range" id="ph" min="0" max="314" value="90"><span id="phV">90</span></label>
+  <label>decay <input type="range" id="dc" min="0" max="100" value="3"><span id="dcV">3</span></label>
+  <label>freq Z <input type="range" id="fz" min="0" max="8" value="0" step=".1"><span id="fzV">0</span></label>
+</div>
+<button class="btn" style="bottom:16px;right:16px" onclick="reset()">New</button>
+<button class="btn" style="bottom:16px;right:65px" onclick="randomize()">Random</button>
+<button class="btn" style="bottom:16px;right:135px" onclick="gallery()">Gallery</button>
+<button class="btn" style="bottom:16px;right:200px" onclick="cycleColor()">Color: <span id="colName">Gold</span></button>
+<button class="btn" style="bottom:16px;right:300px" onclick="exportPNG()">Export PNG</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+
+// === HARMONOGRAPH PARAMETERS ===
+let freqX=3,freqY=2,phase=Math.PI/2,decay=.003,freqZ=0;
+let t=0,drawing=true,points=[];
+
+function resize(){W=C.width=innerWidth;H=C.height=innerHeight;reset();}
+resize();addEventListener('resize',resize);
+
+const COLORS=[
+  {name:'Gold',fn:t=>'hsla('+(35+t*.5)+',80%,'+(50+Math.sin(t*.01)*15)+'%,'},
+  {name:'Cyan',fn:t=>'hsla('+(180+t*.3)+',70%,'+(45+Math.sin(t*.01)*15)+'%,'},
+  {name:'Rose',fn:t=>'hsla('+(340+t*.2)+',65%,'+(50+Math.sin(t*.01)*10)+'%,'},
+  {name:'Rainbow',fn:t=>'hsla('+(t*.5%360)+',60%,55%,'},
+  {name:'Silver',fn:t=>'hsla(220,5%,'+(40+Math.sin(t*.01)*20)+'%,'},
+];
+let colorIdx=0;
+function cycleColor(){colorIdx=(colorIdx+1)%COLORS.length;document.getElementById('colName').textContent=COLORS[colorIdx].name;reset();}
+
+function readParams(){
+  freqX=+(document.getElementById('fx').value);
+  freqY=+(document.getElementById('fy').value);
+  phase=+(document.getElementById('ph').value)/100*Math.PI;
+  decay=+(document.getElementById('dc').value)/10000;
+  freqZ=+(document.getElementById('fz').value);
+  document.getElementById('fxV').textContent=freqX.toFixed(1);
+  document.getElementById('fyV').textContent=freqY.toFixed(1);
+  document.getElementById('phV').textContent=(phase/Math.PI*180).toFixed(0)+'\u00b0';
+  document.getElementById('dcV').textContent=(decay*10000).toFixed(0);
+  document.getElementById('fzV').textContent=freqZ.toFixed(1);
+}
+
+// === PRESETS (beautiful ratios) ===
+const GALLERY=[
+  {fx:2,fy:3,ph:90,dc:3,fz:0,name:'Classic 2:3'},
+  {fx:3,fy:4,ph:45,dc:2,fz:0,name:'Waltz 3:4'},
+  {fx:1,fy:1,ph:90,dc:5,fz:0,name:'Circle Decay'},
+  {fx:5,fy:4,ph:60,dc:1,fz:0,name:'Complex 5:4'},
+  {fx:3,fy:2,ph:0,dc:4,fz:1,name:'3D Twist'},
+  {fx:7,fy:5,ph:30,dc:2,fz:0,name:'Dense 7:5'},
+  {fx:2,fy:3,ph:45,dc:1,fz:2,name:'Rotational'},
+  {fx:1,fy:2,ph:90,dc:8,fz:0,name:'Lissajous'},
+];
+let galleryIdx=0;
+
+function gallery(){
+  const p=GALLERY[galleryIdx%GALLERY.length];galleryIdx++;
+  document.getElementById('fx').value=p.fx;
+  document.getElementById('fy').value=p.fy;
+  document.getElementById('ph').value=p.ph;
+  document.getElementById('dc').value=p.dc;
+  document.getElementById('fz').value=p.fz;
+  readParams();reset();
+}
+
+function randomize(){
+  document.getElementById('fx').value=(1+Math.random()*10).toFixed(1);
+  document.getElementById('fy').value=(1+Math.random()*10).toFixed(1);
+  document.getElementById('ph').value=Math.floor(Math.random()*314);
+  document.getElementById('dc').value=Math.floor(1+Math.random()*10);
+  document.getElementById('fz').value=(Math.random()*4).toFixed(1);
+  readParams();reset();
+}
+
+function reset(){
+  readParams();t=0;drawing=true;points=[];
+  X.fillStyle='rgba(4,4,8,1)';X.fillRect(0,0,W,H);
+}
+
+function exportPNG(){const l=document.createElement('a');l.download='harmonograph_'+Date.now()+'.png';l.href=C.toDataURL();l.click();}
+
+// Param change listeners
+document.querySelectorAll('#params input').forEach(el=>{el.oninput=()=>{readParams();reset();};});
+
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();randomize();}
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='g')gallery();
+});
+
+// === RENDER ===
+function anim(){requestAnimationFrame(anim);
+  if(!drawing)return;
+
+  const cx=W/2,cy=H/2;
+  const scale=Math.min(W,H)*.35;
+  const colorFn=COLORS[colorIdx].fn;
+  const stepsPerFrame=20;
+
+  for(let s=0;s<stepsPerFrame;s++){
+    const d=Math.exp(-decay*t);
+    if(d<.001){drawing=false;break;}
+
+    const px=Math.sin(freqX*t+phase)*d;
+    const py=Math.sin(freqY*t)*d;
+    // Optional 3rd pendulum rotation
+    let sx,sy;
+    if(freqZ>0){
+      const rz=freqZ*t*.1;
+      sx=cx+(px*Math.cos(rz)-py*Math.sin(rz))*scale;
+      sy=cy+(px*Math.sin(rz)+py*Math.cos(rz))*scale;
+    }else{
+      sx=cx+px*scale;sy=cy+py*scale;
+    }
+
+    if(points.length>0){
+      const prev=points[points.length-1];
+      // Line opacity decreases with decay
+      const alpha=Math.min(.6,d*.8+.05);
+      X.strokeStyle=colorFn(t)+alpha+')';
+      X.lineWidth=.5+d*1.5;
+      X.beginPath();X.moveTo(prev.x,prev.y);X.lineTo(sx,sy);X.stroke();
+    }
+
+    points.push({x:sx,y:sy});
+    t+=.02;
+  }
+
+  // Subtle center glow
+  if(t<10){
+    X.globalAlpha=.005;
+    const g=X.createRadialGradient(cx,cy,0,cx,cy,scale);
+    g.addColorStop(0,'rgba(255,200,100,.1)');g.addColorStop(1,'rgba(0,0,0,0)');
+    X.fillStyle=g;X.beginPath();X.arc(cx,cy,scale,0,Math.PI*2);X.fill();
+    X.globalAlpha=1;
+  }
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="harmonograph.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
