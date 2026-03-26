@@ -32,11 +32,11 @@ let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
 const SYMBOLS=['✦','◆','▲','●','◈','★','♦','◎','✶','♥','⬟','☽'];
-let cards=[],flipped=[],matched=new Set(),moves=0,pairs=0,gridSize=4,locked=false,bestMoves={};
+let cards=[],flipped=[],matched=new Set(),moves=0,pairs=0,gridSize=4,locked=false,bestMoves={},forgottenPairs=0;
 
 function startGame(size){
   gridSize=size;const total=size*size;const pairCount=total/2;
-  cards=[];flipped=[];matched.clear();moves=0;pairs=0;locked=false;
+  cards=[];flipped=[];matched.clear();moves=0;pairs=0;locked=false;forgottenPairs=0;
   // Create pairs
   const syms=SYMBOLS.slice(0,pairCount);const deck=[...syms,...syms];
   // Shuffle
@@ -62,7 +62,7 @@ C.addEventListener('click',e=>{
     g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.2);o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.2);}catch(e){}
   if(flipped.length===2){moves++;locked=true;
     if(flipped[0].sym===flipped[1].sym){// Match!
-      flipped[0].matched=flipped[1].matched=true;pairs++;
+      flipped[0].matched=flipped[1].matched=true;flipped[0].matchedAt=flipped[1].matchedAt=Date.now();pairs++;
       flipped=[];locked=false;
       if(pairs===cards.length/2){// Win!
         const key=''+gridSize;if(!bestMoves[key]||moves<bestMoves[key])bestMoves[key]=moves;
@@ -79,10 +79,23 @@ function anim(){requestAnimationFrame(anim);
     X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
   // Draw cards
   for(const c of cards){
-    if(c.matched){// Matched — show as constellation star
-      X.globalAlpha=.1+Math.sin(Date.now()*.003+c.hue)*.05;X.fillStyle=`hsl(${c.hue},60%,60%)`;
+    if(c.matched){// Matched — show as constellation star, fading with time
+      const age=(Date.now()-(c.matchedAt||Date.now()))/1000; // seconds since match
+      const fade=Math.max(.01,1-age/30); // fade over 30 seconds
+      // If completely faded, it's "forgotten" — unmatched!
+      if(fade<=.02&&!c.forgotten){
+        c.forgotten=true;c.matched=false;c.flip=0;forgottenPairs++;pairs--;
+        // Find pair and forget it too
+        const twin=cards.find(o=>o!==c&&o.sym===c.sym&&o.matched);
+        if(twin){twin.forgotten=true;twin.matched=false;twin.flip=0;}
+        continue;
+      }
+      X.globalAlpha=(.1+Math.sin(Date.now()*.003+c.hue)*.05)*fade;X.fillStyle=`hsl(${c.hue},60%,60%)`;
       X.beginPath();X.arc(c.x,c.y,8,0,Math.PI*2);X.fill();
-      X.globalAlpha=.03;X.beginPath();X.arc(c.x,c.y,20,0,Math.PI*2);X.fill();
+      X.globalAlpha=.03*fade;X.beginPath();X.arc(c.x,c.y,20,0,Math.PI*2);X.fill();
+      // Fading warning
+      if(fade<.3){X.globalAlpha=.06*(1-fade/.3);X.strokeStyle='#ff4444';X.lineWidth=.5;
+        X.beginPath();X.arc(c.x,c.y,12,0,Math.PI*2);X.stroke();}
       continue;}
     // Card background
     X.globalAlpha=.06;X.fillStyle='#fff';
@@ -101,7 +114,7 @@ function anim(){requestAnimationFrame(anim);
     X.globalAlpha=.04;X.strokeStyle=`hsl(${matchedCards[i].hue},50%,60%)`;X.lineWidth=.5;
     X.beginPath();X.moveTo(matchedCards[i].x,matchedCards[i].y);X.lineTo(matchedCards[i+1].x,matchedCards[i+1].y);X.stroke();}
   X.globalAlpha=1;
-  document.getElementById('score').textContent=moves+' moves · '+pairs+' pairs'+(bestMoves[gridSize]?' · best: '+bestMoves[gridSize]:'');}
+  document.getElementById('score').textContent=moves+' moves \u00b7 '+pairs+' pairs'+(forgottenPairs?' \u00b7 '+forgottenPairs+' forgotten':'')+(bestMoves[gridSize]?' \u00b7 best: '+bestMoves[gridSize]:'');}
 
 startGame(4);anim();
 addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
