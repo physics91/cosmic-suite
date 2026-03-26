@@ -74,8 +74,9 @@ function initSound(){
 function updateSound(){
   if(!soundOn||!aC)return;
   const t=aC.currentTime;const pat=PATTERNS[patIdx];const dur=pat.times[breathPhase];
-  // Inhale → brighter, exhale → deeper
-  const baseF=breathPhase===0?220:breathPhase===2?180:200;
+  // Breath tone — rising on inhale, falling on exhale
+  const sweep=breathPhase===0?150+progress*80:breathPhase===2?230-progress*80:200;
+  const baseF=sweep;
   oscL.frequency.setTargetAtTime(baseF,t,.5);oscR.frequency.setTargetAtTime(baseF+4,t,.5);
   // Volume follows breath
   const vol=breathPhase===0?.08:breathPhase===2?.04:.06;
