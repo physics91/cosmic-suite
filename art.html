@@ -108,6 +108,8 @@ function ringWells(){clearWells();const n=8;const m=+(document.getElementById('g
 function exportArt(){const l=document.createElement('a');l.download=`gravity_art_${Date.now()}.png`;l.href=artC.toDataURL('image/png');l.click();}
 
 // Render
+addEventListener('keydown',e=>{if(e.key==='p'){currentPalette=(currentPalette+1)%PALETTES.length;buildPalette();}
+  if(e.key==='s')symm=!symm;if(e.key==='c')clearArt();if(e.key==='r')randomWells();if(e.key==='x')clearWells();});
 let _af=0,_at=0,_afps=0;
 function anim(){requestAnimationFrame(anim);
   const trail=+(document.getElementById('tLen').value);
