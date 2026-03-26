@@ -42,6 +42,7 @@
   <button class="btn" onclick="clearStars()">Clear</button>
   <button class="btn" onclick="randomize()">Random</button>
   <button class="btn" onclick="reverse=!reverse;this.textContent=reverse?'← Rev':'→ Fwd'">→ Fwd</button>
+  <button class="btn" onclick="pingpong=!pingpong;this.textContent=pingpong?'PingPong':'Normal'">Normal</button>
   <button class="btn" onclick="tapTempo()">Tap</button>
   <button class="btn" onclick="exportMidi()">Export</button>
 </div>
@@ -69,7 +70,7 @@ const SCALES={
   blues:[0,3,5,6,7,10]};
 
 // Stars
-let stars=[],playing=false,playPos=0,bpm=80,lastBeat=0,octave=0,reverse=false,loops=0;
+let stars=[],playing=false,playPos=0,bpm=80,lastBeat=0,octave=0,reverse=false,loops=0,pingpong=false;
 
 class MusicStar{
   constructor(x,y){this.x=x;this.y=y;this.sz=3+Math.random()*3;this.hue=Math.random()*360;
@@ -181,7 +182,8 @@ function anim(){requestAnimationFrame(anim);
   drawGrid(X);
   // Playhead
   if(playing){const now=performance.now();const beatInterval=60000/bpm/4;// 16th notes
-    if(now-lastBeat>beatInterval){lastBeat=now;const prev=playPos;playPos=reverse?(playPos+15)%16:(playPos+1)%16;if(!reverse&&playPos===0&&prev===15)loops++;if(reverse&&playPos===15&&prev===0)loops++;
+    if(now-lastBeat>beatInterval){lastBeat=now;const prev=playPos;playPos=reverse?(playPos+15)%16:(playPos+1)%16;if(!reverse&&playPos===0&&prev===15){loops++;if(pingpong)reverse=true;}
+      if(reverse&&playPos===15&&prev===0){loops++;if(pingpong)reverse=false;}
       // Trigger stars in this column
       for(const s of stars){const info=s.getNoteInfo();if(info.col===playPos)s.play();}}
     const ph=$('playhead');ph.style.left=(playPos/16*100)+'%';}
