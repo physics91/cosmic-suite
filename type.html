@@ -88,6 +88,7 @@ input.addEventListener('input',()=>{
 
 input.addEventListener('keydown',e=>{
   if(e.key==='Tab'){e.preventDefault();hueBase=(hueBase+60)%360;}
+  if(e.key==='Escape'){input.value='';lastLength=0;}
   if(e.key==='Enter'){// Submit line — burst all remaining characters
     const val=input.value.trim();
     if(val){const words=val.split(/\s+/);
