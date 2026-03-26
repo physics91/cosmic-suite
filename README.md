@@ -2,7 +2,7 @@
 
 ![Lines](https://img.shields.io/badge/lines-7700+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-24_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-150+-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**24 cosmic experiences in pure HTML. No dependencies.**
+**25 cosmic experiences in pure HTML. No dependencies.**
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -34,6 +34,7 @@
 | 🌄 | **Sonic Terrain** | Terrain × Music · landscape becomes melody | Create |
 | 🕳 | **Gravity Well** | Bend spacetime · light lensing · accretion disks | Think |
 | 〰 | **Fourier** | Draw waveforms · hear shapes · see sound | Create |
+| 🎵 | **Gravity Beats** | Rhythm in warped spacetime · notes bend around wells | Play |
 
 ## Quick Start
 

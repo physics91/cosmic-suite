@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gravity Beats</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='16' cy='16' r='5' fill='none' stroke='%236644ff' stroke-width='1' opacity='.4'/><circle cx='16' cy='10' r='2' fill='%23ff44aa' opacity='.6'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#050510;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #hud{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.2);font-size:11px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #score{position:fixed;top:40px;left:50%;transform:translateX(-50%);color:rgba(255,200,100,.4);font-size:28px;font-weight:200;z-index:2;pointer-events:none}
+    #combo{position:fixed;top:72px;left:50%;transform:translateX(-50%);color:rgba(255,100,200,.3);font-size:12px;letter-spacing:2px;z-index:2;pointer-events:none}
+    #judge{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:24px;font-weight:200;letter-spacing:5px;z-index:2;pointer-events:none;opacity:0;transition:opacity .2s}
+    #start{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10;text-align:center;cursor:pointer}
+    #start h1{color:rgba(255,255,255,.5);font-weight:100;font-size:30px;letter-spacing:8px}
+    #start p{color:rgba(255,255,255,.2);font-size:11px;margin-top:12px;letter-spacing:2px}
+    .lane-label{position:fixed;bottom:50px;color:rgba(255,255,255,.08);font-size:20px;font-weight:200;z-index:2;pointer-events:none}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">GRAVITY BEATS</div>
+<div id="score">0</div>
+<div id="combo"></div>
+<div id="judge"></div>
+<div id="start" onclick="startGame()"><h1>GRAVITY BEATS</h1><p>notes fall through warped spacetime<br>DFJK to hit &middot; SPACE to place gravity well<br>click to start</p></div>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// === GAME STATE ===
+const LANES=4;
+const KEYS=['d','f','j','k'];
+const LANE_COLORS=['#ff4488','#44aaff','#ffcc44','#44ffaa'];
+let started=false,score=0,combo=0,maxCombo=0,hits=0,misses=0;
+let notes=[],wells=[],particles=[],judgments=[];
+let time=0,nextSpawn=0,bpm=120,beatInterval=60/bpm;
+let difficulty=1;
+
+// === AUDIO ===
+let aC=null;
+function initAudio(){aC=new(AudioContext||webkitAudioContext)();}
+function playHit(lane,perfect){
+  if(!aC)return;
+  const t=aC.currentTime;
+  const freqs=[262,330,392,523]; // C E G C5
+  const o=aC.createOscillator(),g=aC.createGain();
+  o.type=perfect?'sine':'triangle';
+  o.frequency.value=freqs[lane]*(perfect?1:1.01);
+  g.gain.setValueAtTime(perfect?.08:.04,t);
+  g.gain.exponentialRampToValueAtTime(.001,t+(perfect?.4:.2));
+  o.connect(g);g.connect(aC.destination);o.start(t);o.stop(t+.5);
+  if(perfect){
+    const o2=aC.createOscillator(),g2=aC.createGain();
+    o2.type='sine';o2.frequency.value=freqs[lane]*2;
+    g2.gain.setValueAtTime(.03,t);g2.gain.exponentialRampToValueAtTime(.001,t+.3);
+    o2.connect(g2);g2.connect(aC.destination);o2.start(t);o2.stop(t+.3);
+  }
+}
+function playMiss(){
+  if(!aC)return;
+  const t=aC.currentTime;
+  const o=aC.createOscillator(),g=aC.createGain();
+  o.type='sawtooth';o.frequency.value=80;
+  g.gain.setValueAtTime(.02,t);g.gain.exponentialRampToValueAtTime(.001,t+.15);
+  o.connect(g);g.connect(aC.destination);o.start(t);o.stop(t+.2);
+}
+function playWellPlace(){
+  if(!aC)return;
+  const t=aC.currentTime;
+  const o=aC.createOscillator(),g=aC.createGain();
+  o.type='sine';o.frequency.value=150;
+  g.gain.setValueAtTime(.03,t);g.gain.exponentialRampToValueAtTime(.001,t+.5);
+  o.connect(g);g.connect(aC.destination);o.start(t);o.stop(t+.5);
+}
+
+// === GRAVITY WELLS ===
+class GravityWell{
+  constructor(x,y){this.x=x;this.y=y;this.mass=40;this.life=8;this.born=time;this.phase=0;}
+}
+
+// === NOTES ===
+class Note{
+  constructor(lane){
+    this.lane=lane;
+    const laneW=W/LANES;
+    this.x=laneW*lane+laneW/2;
+    this.y=-20;
+    this.vy=2;this.vx=0;
+    this.alive=true;this.hit=false;
+    this.trail=[];
+    this.hue=0;
+  }
+}
+
+// === LANE POSITIONS ===
+function getLaneX(lane){return W/LANES*lane+W/LANES/2;}
+function getHitY(){return H-100;}
+
+// === INPUT ===
+const keysDown={};
+addEventListener('keydown',e=>{
+  if(!started)return;
+  const lane=KEYS.indexOf(e.key.toLowerCase());
+  if(lane>=0&&!keysDown[lane]){
+    keysDown[lane]=true;
+    tryHit(lane);
+  }
+  if(e.key===' '){
+    e.preventDefault();
+    // Place well at mouse or center
+    const wx=lastMX||W/2,wy=lastMY||H/2;
+    if(wells.length<3){
+      wells.push(new GravityWell(wx,wy));
+      playWellPlace();
+    }
+  }
+});
+addEventListener('keyup',e=>{
+  const lane=KEYS.indexOf(e.key.toLowerCase());
+  if(lane>=0)keysDown[lane]=false;
+});
+let lastMX=W/2,lastMY=H/2;
+addEventListener('mousemove',e=>{lastMX=e.clientX;lastMY=e.clientY;});
+// Touch lanes
+addEventListener('touchstart',e=>{
+  if(!started){startGame();return;}
+  for(const touch of e.changedTouches){
+    const lane=Math.floor(touch.clientX/W*LANES);
+    if(lane>=0&&lane<LANES)tryHit(lane);
+  }
+},{passive:true});
+
+function tryHit(lane){
+  const hitY=getHitY();
+  let bestNote=null,bestDist=80;
+  for(const n of notes){
+    if(!n.alive||n.hit||n.lane!==lane)continue;
+    const d=Math.abs(n.y-hitY);
+    if(d<bestDist){bestDist=d;bestNote=n;}
+  }
+  if(bestNote){
+    bestNote.hit=true;bestNote.alive=false;
+    const perfect=bestDist<25;
+    const pts=perfect?100:50;
+    score+=pts*(1+Math.floor(combo/10)*.1);
+    combo++;if(combo>maxCombo)maxCombo=combo;hits++;
+    playHit(lane,perfect);
+    // Judgment
+    showJudge(perfect?'PERFECT':'GOOD',perfect?'rgba(255,200,100,.6)':'rgba(100,200,255,.4)');
+    // Particles
+    for(let i=0;i<(perfect?15:8);i++){
+      particles.push({x:bestNote.x,y:bestNote.y,vx:(Math.random()-.5)*6,vy:-Math.random()*4-2,
+        life:1,color:LANE_COLORS[lane],sz:perfect?3:2});
+    }
+  }else{
+    combo=0;misses++;playMiss();
+    showJudge('MISS','rgba(255,80,80,.4)');
+  }
+}
+
+function showJudge(text,color){
+  const el=document.getElementById('judge');
+  el.textContent=text;el.style.color=color;el.style.opacity='1';
+  setTimeout(()=>el.style.opacity='0',300);
+}
+
+// === SPAWN ===
+function spawnNote(){
+  const lane=Math.random()*LANES|0;
+  notes.push(new Note(lane));
+}
+
+function startGame(){
+  initAudio();started=true;
+  document.getElementById('start').style.display='none';
+  score=0;combo=0;maxCombo=0;hits=0;misses=0;
+  notes=[];wells=[];particles=[];
+  nextSpawn=0;difficulty=1;
+}
+
+// === RENDER ===
+const bgStars=Array.from({length:80},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
+
+function anim(){requestAnimationFrame(anim);
+  time+=.016;
+  X.fillStyle='rgba(5,5,16,.15)';X.fillRect(0,0,W,H);
+
+  // Stars
+  for(const s of bgStars){s.p+=.002;X.globalAlpha=.03+Math.sin(s.p)*.015;X.fillStyle='#fff';
+    X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
+
+  if(!started){X.globalAlpha=1;return;}
+
+  // Difficulty ramp
+  difficulty=1+time*.005;
+  beatInterval=60/(bpm+time*.3);
+
+  // Spawn
+  if(time>nextSpawn){
+    spawnNote();
+    nextSpawn=time+beatInterval*(Math.random()<.3?.5:1);
+    if(Math.random()<.1*difficulty)spawnNote(); // double notes
+  }
+
+  const hitY=getHitY();
+  const laneW=W/LANES;
+
+  // Lane dividers
+  X.globalAlpha=.03;X.strokeStyle='#fff';X.lineWidth=.5;
+  for(let i=1;i<LANES;i++){
+    X.beginPath();X.moveTo(laneW*i,0);X.lineTo(laneW*i,H);X.stroke();
+  }
+
+  // Hit zone
+  X.globalAlpha=.04;X.fillStyle='#fff';
+  X.fillRect(0,hitY-3,W,6);
+  // Lane hit indicators
+  for(let i=0;i<LANES;i++){
+    const pressed=keysDown[i];
+    X.globalAlpha=pressed?.15:.04;
+    X.fillStyle=LANE_COLORS[i];
+    X.beginPath();X.arc(getLaneX(i),hitY,pressed?18:12,0,Math.PI*2);X.fill();
+    // Key label
+    X.globalAlpha=.08;X.fillStyle='#fff';X.font='14px sans-serif';X.textAlign='center';
+    X.fillText(KEYS[i].toUpperCase(),getLaneX(i),hitY+35);
+  }
+
+  // Gravity wells — update & draw
+  for(let i=wells.length-1;i>=0;i--){
+    const w=wells[i];
+    w.life-=.016;w.phase+=.03;
+    if(w.life<=0){wells.splice(i,1);continue;}
+    const fade=Math.min(1,w.life/2);
+    // Spacetime distortion visualization
+    const wr=Math.sqrt(w.mass)*3;
+    X.globalAlpha=fade*.1;
+    const wg=X.createRadialGradient(w.x,w.y,0,w.x,w.y,wr*3);
+    wg.addColorStop(0,'rgba(100,68,255,.3)');wg.addColorStop(.5,'rgba(60,30,120,.1)');wg.addColorStop(1,'rgba(0,0,0,0)');
+    X.fillStyle=wg;X.beginPath();X.arc(w.x,w.y,wr*3,0,Math.PI*2);X.fill();
+    // Accretion ring
+    X.strokeStyle='rgba(100,68,255,.2)';X.lineWidth=1;X.globalAlpha=fade*.15;
+    X.beginPath();X.ellipse(w.x,w.y,wr*2,wr*.6,w.phase,0,Math.PI*2);X.stroke();
+    // Core
+    X.globalAlpha=fade*.2;X.fillStyle='#6644ff';
+    X.beginPath();X.arc(w.x,w.y,wr*.4,0,Math.PI*2);X.fill();
+    // Warp grid
+    X.strokeStyle='rgba(100,68,255,.04)';X.lineWidth=.5;X.globalAlpha=fade;
+    for(let gx=w.x-80;gx<w.x+80;gx+=20){
+      X.beginPath();
+      for(let gy=w.y-80;gy<w.y+80;gy+=4){
+        const dx=gx-w.x,dy=gy-w.y;
+        const d2=dx*dx+dy*dy+500;
+        const f=w.mass*50/d2;
+        const px=gx-dx/Math.sqrt(d2)*f;
+        const py=gy-dy/Math.sqrt(d2)*f;
+        gy===w.y-80?X.moveTo(px,py):X.lineTo(px,py);
+      }
+      X.stroke();
+    }
+  }
+
+  // Update notes with gravity
+  for(let i=notes.length-1;i>=0;i--){
+    const n=notes[i];
+    if(!n.alive){notes.splice(i,1);continue;}
+
+    // Base velocity
+    n.vy+=.06*difficulty;
+
+    // Gravity from wells!
+    for(const w of wells){
+      const dx=w.x-n.x,dy=w.y-n.y;
+      const d2=dx*dx+dy*dy+500;
+      const d=Math.sqrt(d2);
+      const f=w.mass*15/d2;
+      n.vx+=dx/d*f;
+      n.vy+=dy/d*f;
+    }
+
+    // Cap speed
+    const spd=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
+    if(spd>12){n.vx=n.vx/spd*12;n.vy=n.vy/spd*12;}
+
+    n.x+=n.vx;n.y+=n.vy;
+
+    // Trail
+    n.trail.push({x:n.x,y:n.y});
+    if(n.trail.length>20)n.trail.shift();
+
+    // Miss — past hit zone
+    if(n.y>H+50){
+      n.alive=false;combo=0;misses++;
+      showJudge('MISS','rgba(255,80,80,.3)');
+      playMiss();
+      continue;
+    }
+
+    // Draw trail
+    if(n.trail.length>1){
+      X.strokeStyle=LANE_COLORS[n.lane];X.lineWidth=2;X.globalAlpha=.1;
+      X.beginPath();
+      for(let j=0;j<n.trail.length;j++){
+        const tp=n.trail[j];
+        j===0?X.moveTo(tp.x,tp.y):X.lineTo(tp.x,tp.y);
+      }
+      X.stroke();
+    }
+
+    // Draw note
+    const distToHit=Math.abs(n.y-hitY);
+    const nearHit=distToHit<40;
+    X.globalAlpha=nearHit?.8:.5;
+    X.fillStyle=LANE_COLORS[n.lane];
+    X.beginPath();X.arc(n.x,n.y,nearHit?10:7,0,Math.PI*2);X.fill();
+    // Glow
+    X.globalAlpha=nearHit?.15:.05;
+    X.beginPath();X.arc(n.x,n.y,nearHit?20:14,0,Math.PI*2);X.fill();
+
+    // Warped? indicator
+    if(Math.abs(n.vx)>1){
+      X.globalAlpha=.1;X.strokeStyle='#6644ff';X.lineWidth=.5;
+      X.beginPath();X.arc(n.x,n.y,12,0,Math.PI*2);X.stroke();
+    }
+  }
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.life-=.025;
+    if(p.life<=0){particles.splice(i,1);continue;}
+    X.globalAlpha=p.life*.5;X.fillStyle=p.color;
+    X.beginPath();X.arc(p.x,p.y,p.sz*p.life,0,Math.PI*2);X.fill();
+  }
+
+  X.globalAlpha=1;
+
+  // HUD
+  document.getElementById('score').textContent=Math.floor(score);
+  document.getElementById('combo').textContent=combo>1?combo+'x COMBO'+(combo>=10?' \u2605':''):'';
+  const acc=hits+misses>0?Math.round(hits/(hits+misses)*100):100;
+  document.getElementById('hud').textContent='GRAVITY BEATS \u00b7 '+acc+'% \u00b7 wells: '+(3-wells.length)+' left';
+}
+anim();
+
+addEventListener('keydown',e=>{if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});});
+</script>
+</body>
+</html>
