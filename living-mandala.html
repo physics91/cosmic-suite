@@ -25,6 +25,7 @@
   <button class="btn" onclick="burst()">Burst</button>
   <button class="btn" onclick="attract=!attract;this.textContent=attract?'Attract':'Repel'">Attract</button>
   <button class="btn" onclick="const l=document.createElement('a');l.download='living_mandala.png';l.href=C.toDataURL();l.click()">Save</button>
+  <button class="btn" id="micBtn" onclick="toggleMic()">Mic</button>
 </div>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="#" onclick="const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chat.html','clock.html','conway.html','dice.html','entropy.html','fourier.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','pendulum.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
 <script>
@@ -66,9 +67,48 @@ C.addEventListener('mousemove',e=>{if(e.buttons)addAt(e.clientX,e.clientY);});
 C.addEventListener('touchstart',e=>{e.preventDefault();addAt(e.touches[0].clientX,e.touches[0].clientY);});
 C.addEventListener('touchmove',e=>{e.preventDefault();addAt(e.touches[0].clientX,e.touches[0].clientY);});
 
+// === MIC REACTIVE ===
+let micOn=false,micAC=null,micAn=null,micData=null,micVol=0;
+async function toggleMic(){
+  if(micOn){micOn=false;document.getElementById('micBtn').textContent='Mic';return;}
+  try{
+    if(!micAC)micAC=new(AudioContext||webkitAudioContext)();
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const src=micAC.createMediaStreamSource(stream);
+    micAn=micAC.createAnalyser();micAn.fftSize=256;
+    src.connect(micAn);micData=new Uint8Array(micAn.frequencyBinCount);
+    micOn=true;document.getElementById('micBtn').textContent='Mic ON';
+  }catch(e){micOn=false;}
+}
+
+function readMic(){
+  if(!micOn||!micAn)return;
+  micAn.getByteFrequencyData(micData);
+  let sum=0;for(let i=0;i<micData.length;i++)sum+=micData[i];
+  micVol=sum/(micData.length*255);
+  // Sound drives the mandala
+  if(micVol>.05){
+    // Spawn motes proportional to volume
+    if(particles.length<300&&Math.random()<micVol*.3){
+      const peakBin=micData.indexOf(Math.max(...micData));
+      const angle=peakBin/micData.length*Math.PI*2/symN;
+      particles.push(new Mote(30+micVol*200,angle));
+    }
+  }
+}
+
 function anim(){requestAnimationFrame(anim);
-  X.fillStyle='rgba(6,6,16,.06)';X.fillRect(0,0,W,H);
+  readMic();
+  // Background breathes with mic volume
+  const breath=micOn?micVol:.0;
+  X.fillStyle='rgba('+(6+breath*10)+','+(6+breath*5)+','+(16+breath*8)+',.06)';X.fillRect(0,0,W,H);
   const cx=W/2,cy=H/2;
+  // Mic drives center force strength
+  if(micOn){
+    for(const p of particles){
+      p.vr+=(micVol-.1)*.3; // volume pushes outward, silence contracts
+    }
+  }
   // Update
   for(const p of particles)p.update();
   // Draw with symmetry
