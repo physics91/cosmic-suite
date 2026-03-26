@@ -28,7 +28,7 @@ resize();addEventListener('resize',resize);
 
 // Game state
 let state='menu',score=0,bestScore=+(localStorage.getItem('orbit_best')||0),bestLevel=+(localStorage.getItem('orbit_blvl')||1),level=1,games=+(localStorage.getItem('orbit_games')||0);
-let ship={x:0,y:0,vx:0,vy:0,trail:[],alive:true,fuel:100};
+let ship={x:0,y:0,vx:0,vy:0,trail:[],alive:true,fuel:100},combo=0,comboTimer=0;
 let stars=[],collectibles=[],particles=[];
 let shakeAmt=0,slowmo=1;
 
@@ -105,7 +105,7 @@ function update(){
   // Collectibles
   for(const c of collectibles){if(c.collected)continue;
     const dx=c.x-ship.x,dy=c.y-ship.y;
-    if(dx*dx+dy*dy<(c.sz+5)*(c.sz+5)){c.collected=true;c.glow=1;score++;
+    if(dx*dx+dy*dy<(c.sz+5)*(c.sz+5)){c.collected=true;c.glow=1;combo++;comboTimer=90;score+=combo;
       try{const a=new(AudioContext||webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=600+score*20;o.type='sine';g.gain.setValueAtTime(.03,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.2);o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.2);}catch(e){}
       // Burst particles
       for(let i=0;i<8;i++){const a=i*Math.PI/4;particles.push({x:c.x,y:c.y,vx:Math.cos(a)*3,vy:Math.sin(a)*3,life:20,color:'#ffcc44'});}
@@ -119,7 +119,7 @@ function update(){
   // Particles
   for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life--;p.vx*=.95;p.vy*=.95;}
   particles=particles.filter(p=>p.life>0);
-  // Score ticks up over time
+  comboTimer--;if(comboTimer<=0)combo=0;
   if(Math.random()<.02)score++;
   // Shake decay
   if(shakeAmt>0)shakeAmt*=.9;}
@@ -174,7 +174,7 @@ function render(){requestAnimationFrame(render);
   X.globalAlpha=1;X.restore();
   document.getElementById('score').textContent=score;
   const alt=state==='play'?Math.round(Math.sqrt((ship.x-stars[0].x)**2+(ship.y-stars[0].y)**2)):0;
-  document.getElementById('hint').textContent=state==='play'?'LEVEL '+level+(boosting?' · BOOST':'')+(alt?' · ALT '+alt:''):'';}
+  document.getElementById('hint').textContent=state==='play'?'LEVEL '+level+(boosting?' · BOOST':'')+(alt?' · ALT '+alt:'')+(combo>1?' · x'+combo+' COMBO':''):'';}
 render();
 addEventListener("keydown",e=>{if(e.key==="f"&&!e.target.closest("input"))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
