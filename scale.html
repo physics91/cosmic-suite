@@ -24,7 +24,7 @@
 <div id="label"><h1 id="name">HUMAN</h1><div class="sz" id="size">~1.7 m</div><div class="desc" id="desc">You are here. Everything else is relative to you.</div></div>
 <div id="scaleBar"><div id="scalePos"></div></div>
 <div id="power">10<sup>0</sup> m</div>
-<div id="hint">SCROLL TO ZOOM · <span onclick="targetPower=OBJECTS[Math.random()*OBJECTS.length|0][0]" style="cursor:pointer;text-decoration:underline">RANDOM JUMP</span></div>
+<div id="hint">SCROLL TO ZOOM · <span onclick="targetPower=OBJECTS[Math.random()*OBJECTS.length|0][0]" style="cursor:pointer;text-decoration:underline">RANDOM</span> · <span onclick="mapMode=!mapMode" style="cursor:pointer;text-decoration:underline">MAP VIEW</span></div>
 <script>
 const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
@@ -55,7 +55,7 @@ const OBJECTS=[
   [26,'OBSERVABLE UNIVERSE','~10²⁶ m','93 billion light years across. 2 trillion galaxies. Everything we can see.','#444466','sphere'],
 ];
 
-let currentPower=0,targetPower=0,autoScroll=false,autoDir=1;
+let currentPower=0,targetPower=0,autoScroll=false,autoDir=1,mapMode=false;
 
 addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowRight'){targetPower=Math.min(26,targetPower+1);}
   if(e.key==='ArrowUp'||e.key==='ArrowLeft'){targetPower=Math.max(-15,targetPower-1);}
@@ -127,6 +127,25 @@ function anim(){requestAnimationFrame(anim);
   // Scale bar position
   const barPos=((currentPower+15)/41)*100;
   document.getElementById('scalePos').style.top=barPos+'%';
+
+  // MAP VIEW — all objects simultaneously
+  if(mapMode){X.save();X.setTransform(1,0,0,1,0,0);X.fillStyle='rgba(5,5,8,.3)';X.fillRect(0,0,W,H);
+    const cols=Math.ceil(Math.sqrt(OBJECTS.length));
+    for(let i=0;i<OBJECTS.length;i++){
+      const col=i%cols,row=Math.floor(i/cols);
+      const bx=40+col*(W-80)/cols,by=60+row*(H-120)/Math.ceil(OBJECTS.length/cols);
+      const o=OBJECTS[i];const near=Math.abs(currentPower-o[0])<2;
+      // Dot
+      X.globalAlpha=near?.4:.12;X.fillStyle=o[4];
+      const sz=near?8:4;X.beginPath();X.arc(bx,by,sz,0,Math.PI*2);X.fill();
+      // Label
+      X.globalAlpha=near?.5:.15;X.font=(near?'10':'7')+'px sans-serif';X.textAlign='center';
+      X.fillStyle='#fff';X.fillText(o[1],bx,by+sz+12);
+      X.globalAlpha=near?.3:.08;X.font='6px monospace';X.fillText(o[2],bx,by+sz+20);
+      // Click to jump
+      if(near){X.globalAlpha=.06;X.beginPath();X.arc(bx,by,16,0,Math.PI*2);X.fill();}}
+    X.restore();}
+
   // "YOU" marker at human scale
   const youPos=((0+15)/41)*100;
   X.globalAlpha=.06;X.fillStyle='#ffcc44';X.font='6px sans-serif';X.textAlign='right';
