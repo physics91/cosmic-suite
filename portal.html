@@ -127,6 +127,13 @@ function anim(){requestAnimationFrame(anim);t+=.01;
     // Icon
     X.globalAlpha=isHov?.8:.3;X.font=(isHov?16:11)+'px sans-serif';X.textAlign='center';X.textBaseline='middle';
     X.fillText(exp.icon,px,py);
+    // Connection to neighbors when hovered
+    if(isHov){for(let j=0;j<EXP.length;j++){if(j===i)continue;const e2=EXP[j];
+      const r2=60+e2.orbit*30;const a2=t*.2/e2.orbit+j*Math.PI*2/EXP.length;
+      const px2=cx+Math.cos(a2)*r2,py2=cy+Math.sin(a2)*r2;
+      const d=Math.sqrt((px-px2)**2+(py-py2)**2);if(d<200){
+        X.globalAlpha=.04*(1-d/200);X.strokeStyle=exp.color;X.lineWidth=.5;
+        X.beginPath();X.moveTo(px,py);X.lineTo(px2,py2);X.stroke();}}}
     // Sparkles on hover
     if(isHov){for(let s=0;s<3;s++){const sa=Math.random()*Math.PI*2;const sd=sz+Math.random()*20;
       X.globalAlpha=Math.random()*.2;X.fillStyle=exp.color;X.beginPath();
