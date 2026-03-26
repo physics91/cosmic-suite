@@ -100,6 +100,10 @@ function anim(){requestAnimationFrame(anim);
   else if(obj[5]==='web'){X.strokeStyle=col;X.lineWidth=.3;X.globalAlpha=proximity*.04;for(let i=0;i<20;i++){X.beginPath();X.moveTo(cx+Math.sin(i*3.7)*r*2,cy+Math.cos(i*5.3)*r*2);X.lineTo(cx+Math.sin(i*3.7+1)*r*2,cy+Math.cos(i*5.3+1)*r*2);X.stroke();}}
   else if(obj[5]==='sphere'){X.strokeStyle=col;X.lineWidth=.5;X.globalAlpha=proximity*.06;X.beginPath();X.arc(cx,cy,r*2,0,Math.PI*2);X.stroke();X.beginPath();X.ellipse(cx,cy,r*2,r*.6,0,0,Math.PI*2);X.stroke();}
 
+  // Extreme glow at boundaries
+  if(currentPower<-13||currentPower>24){const eg=X.createRadialGradient(cx,cy,0,cx,cy,r*3);
+    eg.addColorStop(0,currentPower<-13?'rgba(255,50,50,.06)':'rgba(100,100,255,.06)');eg.addColorStop(1,'rgba(0,0,0,0)');
+    X.globalAlpha=.5;X.fillStyle=eg;X.beginPath();X.arc(cx,cy,r*3,0,Math.PI*2);X.fill();}
   X.globalAlpha=1;
   // Scale indicator particles
   const scale=Math.pow(10,currentPower);
