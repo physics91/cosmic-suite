@@ -166,6 +166,7 @@ function anim(){requestAnimationFrame(anim);
   X.globalAlpha=1;}
 
 addEventListener('click',e=>{if(!e.target.closest('#controls'))if(!active)toggle();});
+addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();toggle();}});
 anim();
 </script>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
