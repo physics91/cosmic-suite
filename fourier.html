@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fourier</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><path d='M4 16 Q10 6,16 16 Q22 26,28 16' fill='none' stroke='%2344ddff' stroke-width='1.2' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#050510;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block;cursor:crosshair}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.15);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #mode-label{position:fixed;top:40px;left:50%;transform:translateX(-50%);color:rgba(100,220,255,.25);font-size:11px;letter-spacing:4px;z-index:2;pointer-events:none}
+    #harmonics{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;display:flex;flex-direction:column;gap:2px}
+    .harm-bar{height:3px;background:rgba(100,220,255,.3);border-radius:2px;transition:width .1s}
+    .harm-label{color:rgba(255,255,255,.1);font-size:7px;font-family:monospace}
+    #stats{position:fixed;bottom:16px;right:16px;color:rgba(255,255,255,.12);font-size:9px;z-index:2;pointer-events:none;font-family:monospace;text-align:right}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+    .btn.active{background:rgba(100,220,255,.1);border-color:rgba(100,220,255,.3)}
+  </style>
+</head>
+<body>
+<div id="info">DRAW A WAVEFORM · HEAR IT COME ALIVE</div>
+<div id="mode-label">DRAW MODE</div>
+<div id="harmonics"></div>
+<div id="stats"></div>
+<button class="btn active" style="bottom:16px;left:16px" id="btnDraw" onclick="setMode('draw')">Draw</button>
+<button class="btn" style="bottom:16px;left:75px" id="btnMic" onclick="setMode('mic')">Mic</button>
+<button class="btn" style="bottom:16px;left:120px" id="btnPreset" onclick="nextPreset()">Preset: <span id="presetName">—</span></button>
+<button class="btn" style="bottom:16px;left:260px" onclick="clearWave()">Clear</button>
+<button class="btn" style="bottom:40px;left:16px" id="btnPlay" onclick="togglePlay()">▶ Play</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<canvas id="c"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// === WAVEFORM DATA ===
+const SAMPLES=512;
+let waveform=new Float32Array(SAMPLES); // -1 to 1
+let harmonics=new Float32Array(32); // amplitudes of first 32 harmonics
+let phases=new Float32Array(32);
+let mode='draw'; // draw or mic
+let playing=false;
+
+// === AUDIO ===
+let aC=null,masterGain=null,oscillators=[];
+function initAudio(){
+  if(aC)return;
+  aC=new(AudioContext||webkitAudioContext)();
+  masterGain=aC.createGain();
+  masterGain.gain.value=.15;
+  masterGain.connect(aC.destination);
+}
+
+function synthesize(){
+  // Kill old oscillators
+  for(const o of oscillators){try{o.osc.stop();o.gain.disconnect();}catch(e){}}
+  oscillators=[];
+  if(!aC||!playing)return;
+  const baseFreq=110; // A2
+  for(let i=0;i<32;i++){
+    if(harmonics[i]<.005)continue;
+    const osc=aC.createOscillator();
+    const gain=aC.createGain();
+    osc.type='sine';
+    osc.frequency.value=baseFreq*(i+1);
+    gain.gain.value=harmonics[i]*.08;
+    osc.connect(gain);gain.connect(masterGain);
+    osc.start();
+    oscillators.push({osc,gain,harmonic:i});
+  }
+}
+
+function updateOscillators(){
+  for(const o of oscillators){
+    o.gain.gain.setTargetAtTime(harmonics[o.harmonic]*.08,aC.currentTime,.05);
+  }
+}
+
+// === DFT — compute harmonics from waveform ===
+function computeHarmonics(){
+  for(let k=0;k<32;k++){
+    let re=0,im=0;
+    for(let n=0;n<SAMPLES;n++){
+      const angle=2*Math.PI*k*n/SAMPLES;
+      re+=waveform[n]*Math.cos(angle);
+      im-=waveform[n]*Math.sin(angle);
+    }
+    re/=SAMPLES;im/=SAMPLES;
+    harmonics[k]=Math.sqrt(re*re+im*im)*2;
+    phases[k]=Math.atan2(im,re);
+  }
+}
+
+// === INVERSE — reconstruct waveform from harmonics ===
+function reconstructWaveform(){
+  for(let n=0;n<SAMPLES;n++){
+    let v=0;
+    for(let k=0;k<32;k++){
+      if(harmonics[k]<.005)continue;
+      v+=harmonics[k]*Math.cos(2*Math.PI*k*n/SAMPLES+phases[k]);
+    }
+    waveform[n]=v;
+  }
+}
+
+// === PRESETS ===
+const PRESETS=[
+  {name:'Sine',fn:n=>Math.sin(2*Math.PI*n/SAMPLES)},
+  {name:'Square',fn:n=>n<SAMPLES/2?1:-1},
+  {name:'Sawtooth',fn:n=>2*n/SAMPLES-1},
+  {name:'Triangle',fn:n=>4*Math.abs(n/SAMPLES-.5)-1},
+  {name:'Pulse',fn:n=>n<SAMPLES/8?1:-1},
+  {name:'Organ',fn:n=>Math.sin(2*Math.PI*n/SAMPLES)+.5*Math.sin(4*Math.PI*n/SAMPLES)+.25*Math.sin(6*Math.PI*n/SAMPLES)},
+  {name:'Bell',fn:n=>{const t=n/SAMPLES;return Math.sin(2*Math.PI*t)*Math.exp(-t*3)+.3*Math.sin(4.5*Math.PI*t)*Math.exp(-t*5);}},
+  {name:'Noise',fn:()=>Math.random()*2-1},
+];
+let presetIdx=-1;
+function nextPreset(){
+  presetIdx=(presetIdx+1)%PRESETS.length;
+  const p=PRESETS[presetIdx];
+  document.getElementById('presetName').textContent=p.name;
+  for(let i=0;i<SAMPLES;i++)waveform[i]=p.fn(i);
+  // Normalize
+  let mx=0;for(let i=0;i<SAMPLES;i++)mx=Math.max(mx,Math.abs(waveform[i]));
+  if(mx>0)for(let i=0;i<SAMPLES;i++)waveform[i]/=mx;
+  computeHarmonics();
+  if(playing)synthesize();
+}
+
+// === DRAWING ===
+let drawing=false,lastDrawX=-1;
+C.addEventListener('mousedown',e=>{
+  if(mode!=='draw')return;
+  drawing=true;lastDrawX=-1;
+  drawAt(e.clientX,e.clientY);
+});
+C.addEventListener('mousemove',e=>{
+  if(!drawing||mode!=='draw')return;
+  drawAt(e.clientX,e.clientY);
+});
+addEventListener('mouseup',()=>{
+  if(drawing){drawing=false;computeHarmonics();if(playing)synthesize();}
+});
+// Touch
+C.addEventListener('touchstart',e=>{
+  if(mode!=='draw')return;
+  e.preventDefault();drawing=true;lastDrawX=-1;
+  drawAt(e.touches[0].clientX,e.touches[0].clientY);
+},{passive:false});
+C.addEventListener('touchmove',e=>{
+  if(!drawing||mode!=='draw')return;
+  e.preventDefault();
+  drawAt(e.touches[0].clientX,e.touches[0].clientY);
+},{passive:false});
+C.addEventListener('touchend',()=>{
+  if(drawing){drawing=false;computeHarmonics();if(playing)synthesize();}
+});
+
+function drawAt(mx,my){
+  const waveY=H/2,waveH=H*.35;
+  const sampleIdx=Math.floor(mx/W*SAMPLES);
+  const val=-((my-waveY)/waveH); // invert Y
+  const clamped=Math.max(-1,Math.min(1,val));
+  if(lastDrawX>=0){
+    // Interpolate between last and current
+    const from=Math.min(lastDrawX,sampleIdx),to=Math.max(lastDrawX,sampleIdx);
+    const fromVal=waveform[Math.max(0,Math.min(SAMPLES-1,lastDrawX))];
+    for(let i=from;i<=to&&i<SAMPLES;i++){
+      const t=(to===from)?0:(i-from)/(to-from);
+      waveform[i]=fromVal+(clamped-fromVal)*t;
+    }
+  }else{
+    if(sampleIdx>=0&&sampleIdx<SAMPLES)waveform[sampleIdx]=clamped;
+  }
+  lastDrawX=sampleIdx;
+  // Live update harmonics while drawing
+  if(playing&&aC){computeHarmonics();updateOscillators();}
+}
+
+// === MIC INPUT ===
+let micStream=null,analyser=null,micData=null;
+async function startMic(){
+  try{
+    initAudio();
+    micStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const src=aC.createMediaStreamSource(micStream);
+    analyser=aC.createAnalyser();
+    analyser.fftSize=2048;
+    src.connect(analyser);
+    micData=new Float32Array(analyser.frequencyBinCount);
+  }catch(e){
+    setMode('draw');
+  }
+}
+function stopMic(){
+  if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}
+  analyser=null;micData=null;
+}
+
+function setMode(m){
+  mode=m;
+  document.getElementById('btnDraw').classList.toggle('active',m==='draw');
+  document.getElementById('btnMic').classList.toggle('active',m==='mic');
+  document.getElementById('mode-label').textContent=m==='draw'?'DRAW MODE':'MIC MODE';
+  document.getElementById('info').textContent=m==='draw'?'DRAW A WAVEFORM · HEAR IT COME ALIVE':'SING OR SPEAK · SEE YOUR SOUND';
+  if(m==='mic')startMic();else stopMic();
+}
+
+function togglePlay(){
+  initAudio();
+  playing=!playing;
+  document.getElementById('btnPlay').textContent=playing?'⏸ Pause':'▶ Play';
+  document.getElementById('btnPlay').classList.toggle('active',playing);
+  if(playing){computeHarmonics();synthesize();}
+  else{for(const o of oscillators){try{o.osc.stop();}catch(e){}}oscillators=[];}
+}
+
+function clearWave(){
+  waveform.fill(0);harmonics.fill(0);phases.fill(0);
+  if(playing)synthesize();
+  presetIdx=-1;document.getElementById('presetName').textContent='—';
+}
+
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();togglePlay();}
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='c')clearWave();
+  if(e.key==='p')nextPreset();
+  if(e.key==='m')setMode(mode==='draw'?'mic':'draw');
+});
+
+// === RENDER ===
+const bgStars=Array.from({length:80},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
+let frame=0,playPhase=0;
+
+function anim(){requestAnimationFrame(anim);frame++;
+  X.fillStyle='rgba(5,5,16,.08)';X.fillRect(0,0,W,H);
+
+  // Stars
+  for(const s of bgStars){s.p+=.002;X.globalAlpha=.03+Math.sin(s.p)*.015;X.fillStyle='#fff';
+    X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
+
+  // Mic mode — read frequency data into harmonics
+  if(mode==='mic'&&analyser){
+    analyser.getFloatFrequencyData(micData);
+    for(let i=0;i<32;i++){
+      const db=micData[i+1]||(-100);
+      harmonics[i]=Math.max(0,Math.pow(10,(db+60)/40)*.5);
+    }
+    reconstructWaveform();
+  }
+
+  const waveY=H/2,waveH=H*.35;
+
+  // === WAVEFORM DISPLAY ===
+  // Guide line
+  X.strokeStyle='rgba(255,255,255,.03)';X.lineWidth=1;
+  X.beginPath();X.moveTo(0,waveY);X.lineTo(W,waveY);X.stroke();
+
+  // Waveform
+  X.globalAlpha=1;
+  X.strokeStyle='rgba(100,220,255,.5)';X.lineWidth=2;
+  X.beginPath();
+  for(let i=0;i<SAMPLES;i++){
+    const x=i/SAMPLES*W;
+    const y=waveY-waveform[i]*waveH;
+    i===0?X.moveTo(x,y):X.lineTo(x,y);
+  }
+  X.stroke();
+
+  // Glow version
+  X.globalAlpha=.15;X.lineWidth=6;X.strokeStyle='rgba(100,220,255,.3)';
+  X.beginPath();
+  for(let i=0;i<SAMPLES;i++){
+    const x=i/SAMPLES*W;
+    const y=waveY-waveform[i]*waveH;
+    i===0?X.moveTo(x,y):X.lineTo(x,y);
+  }
+  X.stroke();
+
+  // === PLAYBACK INDICATOR ===
+  if(playing){
+    playPhase=(playPhase+.005)%1;
+    const px=playPhase*W;
+    X.globalAlpha=.2;X.strokeStyle='rgba(255,200,100,.5)';X.lineWidth=1;
+    X.beginPath();X.moveTo(px,waveY-waveH-20);X.lineTo(px,waveY+waveH+20);X.stroke();
+  }
+
+  // === HARMONIC BARS — circular display ===
+  const hCx=W*.82,hCy=H*.35,hR=80;
+  for(let i=0;i<32;i++){
+    const a=-Math.PI/2+i/32*Math.PI*2;
+    const amp=harmonics[i]*100;
+    if(amp<.5)continue;
+    const x1=hCx+Math.cos(a)*hR;
+    const y1=hCy+Math.sin(a)*hR;
+    const x2=hCx+Math.cos(a)*(hR+amp);
+    const y2=hCy+Math.sin(a)*(hR+amp);
+    X.globalAlpha=.3+harmonics[i]*.4;
+    X.strokeStyle=`hsl(${200+i*5},70%,60%)`;X.lineWidth=3;
+    X.beginPath();X.moveTo(x1,y1);X.lineTo(x2,y2);X.stroke();
+    // Label every 4th
+    if(i%4===0){
+      X.globalAlpha=.15;X.fillStyle='#fff';X.font='7px monospace';X.textAlign='center';
+      X.fillText((i+1)+'',hCx+Math.cos(a)*(hR+amp+12),hCy+Math.sin(a)*(hR+amp+12));
+    }
+  }
+  // Center circle
+  X.globalAlpha=.05;X.strokeStyle='rgba(100,220,255,.3)';X.lineWidth=.5;
+  X.beginPath();X.arc(hCx,hCy,hR,0,Math.PI*2);X.stroke();
+  X.globalAlpha=.1;X.fillStyle='#fff';X.font='8px sans-serif';X.textAlign='center';
+  X.fillText('HARMONICS',hCx,hCy);
+
+  // === FREQUENCY SPECTRUM — bottom ===
+  const specY=H*.78,specH=H*.12;
+  for(let i=0;i<32;i++){
+    const x=W*.15+i/32*W*.7;
+    const bw=W*.7/32-1;
+    const amp=harmonics[i]*specH;
+    X.globalAlpha=.2+harmonics[i]*.3;
+    X.fillStyle=`hsl(${200+i*5},60%,50%)`;
+    X.fillRect(x,specY+specH-amp,bw,amp);
+  }
+  X.globalAlpha=.06;X.fillStyle='#fff';X.font='7px monospace';X.textAlign='center';
+  X.fillText('110 Hz',W*.15,specY+specH+12);
+  X.fillText('3520 Hz',W*.85,specY+specH+12);
+
+  // === LISSAJOUS FIGURE — phase relationships ===
+  if(harmonics[0]>.01&&harmonics[1]>.01){
+    const lCx=W*.18,lCy=H*.3,lR=40;
+    X.globalAlpha=.12;X.strokeStyle='rgba(255,200,100,.4)';X.lineWidth=1;
+    X.beginPath();
+    for(let i=0;i<200;i++){
+      const t=i/200*Math.PI*2;
+      const lx=lCx+Math.sin(t+phases[0])*lR*harmonics[0];
+      const ly=lCy+Math.sin(2*t+phases[1])*lR*harmonics[1];
+      i===0?X.moveTo(lx,ly):X.lineTo(lx,ly);
+    }
+    X.stroke();
+    X.globalAlpha=.06;X.fillStyle='#fff';X.font='7px sans-serif';X.textAlign='center';
+    X.fillText('LISSAJOUS',lCx,lCy+lR+14);
+  }
+
+  X.globalAlpha=1;
+  // Stats
+  const dominant=harmonics.indexOf(Math.max(...harmonics));
+  const fundFreq=110*(dominant+1);
+  document.getElementById('stats').textContent=
+    `fundamental: ${fundFreq} Hz\nharmonics: ${harmonics.filter(h=>h>.01).length}\nsamples: ${SAMPLES}`;
+}
+anim();
+</script>
+</body>
+</html>
