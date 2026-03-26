@@ -1,8 +1,8 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-15800-black?style=flat-square) ![Files](https://img.shields.io/badge/files-54_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-223-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-16000-black?style=flat-square) ![Files](https://img.shields.io/badge/files-55_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-225-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**54 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
+**55 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
 
 > *From nothing, everything.*
 
@@ -101,10 +101,10 @@ index.html           — Digital Cosmos (4679 lines, the flagship)
 
 ## Stats
 
-- **15,800 lines** of hand-written code
-- **54 HTML files**, each fully self-contained
-- **223 git commits** in ~36 hours
-- **90 iterations** guided by dice rolls
+- **~16,000 lines** of hand-written code
+- **55 HTML files**, each fully self-contained
+- **225 git commits** in ~36 hours
+- **92 iterations** guided by dice rolls
 - **0 external dependencies**
 - **60 FPS** across all experiences
 - **50 unique experiences** across 4 categories
