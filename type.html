@@ -53,7 +53,8 @@ function spawnStar(char){
   const x=W/2+Math.cos(angle)*dist;
   const y=H/2+Math.sin(angle)*dist;
   const hue=(hueBase+totalKeys*7)%360;
-  stars.push({x,y,char,hue,sz:2+Math.random()*3,life:600+Math.random()*400,
+  const fast=startTime&&totalWords>(performance.now()-startTime)/60000;// >1 wps = fast
+  stars.push({x,y,char,hue,sz:(fast?3:2)+Math.random()*3,life:(fast?800:600)+Math.random()*400,
     vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,
     born:performance.now(),glow:1,phase:Math.random()*Math.PI*2});
   totalKeys++;playNote(char);}
