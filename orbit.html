@@ -158,6 +158,10 @@ function render(){requestAnimationFrame(render);
   for(let i=1;i<ship.trail.length;i++){const t=i/ship.trail.length;
     X.globalAlpha=t*.15;X.strokeStyle=`hsl(${trailHue},70%,60%)`;X.lineWidth=t*2;
     X.beginPath();X.moveTo(ship.trail[i-1].x,ship.trail[i-1].y);X.lineTo(ship.trail[i].x,ship.trail[i].y);X.stroke();}
+  // Orbit prediction
+  if(ship.alive&&state==='play'){let px=ship.x,py=ship.y,pvx=ship.vx,pvy=ship.vy;
+    X.globalAlpha=.04;X.strokeStyle='#fff';X.lineWidth=.5;X.beginPath();X.moveTo(px,py);
+    for(let i=0;i<30;i++){for(const star of stars){const dx=star.x-px,dy=star.y-py,d=Math.sqrt(dx*dx+dy*dy)+1;pvx+=(dx/d)*star.mass/(d*d);pvy+=(dy/d)*star.mass/(d*d);}px+=pvx;py+=pvy;X.lineTo(px,py);}X.stroke();}
   // Ship
   if(ship.alive){X.globalAlpha=.2;X.fillStyle='#44aaff';X.beginPath();X.arc(ship.x,ship.y,8,0,Math.PI*2);X.fill();
     X.globalAlpha=.8;X.fillStyle='#fff';X.beginPath();X.arc(ship.x,ship.y,3,0,Math.PI*2);X.fill();
