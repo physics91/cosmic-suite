@@ -27,12 +27,12 @@ let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
 // Game state
-let state='menu',score=0,bestScore=+(localStorage.getItem('orbit_best')||0),level=1;
+let state='menu',score=0,bestScore=+(localStorage.getItem('orbit_best')||0),level=1,games=+(localStorage.getItem('orbit_games')||0);
 let ship={x:0,y:0,vx:0,vy:0,trail:[],alive:true,fuel:100};
 let stars=[],collectibles=[],particles=[];
 let shakeAmt=0,slowmo=1;
 
-document.getElementById('best').textContent=bestScore?'BEST: '+bestScore:'';
+document.getElementById('best').textContent=(bestScore?'BEST: '+bestScore:'')+(games?' · '+games+' GAMES':'');
 
 function startGame(){
   state='play';score=0;level=1;ship.alive=true;ship.fuel=100;particles=[];
@@ -47,6 +47,7 @@ function startGame(){
 
 function gameOver(reason){
   state='dead';
+  games++;localStorage.setItem('orbit_games',''+games);
   if(score>bestScore){bestScore=score;localStorage.setItem('orbit_best',''+bestScore);}
   document.getElementById('msg').textContent='ORBIT LOST\n'+reason+'\nSCORE: '+score+(score>=bestScore&&score>0?'\nNEW BEST!':'')+'\n\nclick to retry';
   document.getElementById('best').textContent='BEST: '+bestScore;shakeAmt=15;}
