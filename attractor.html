@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strange Attractor</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><path d='M10 16 Q16 6 22 16 Q16 26 10 16' fill='none' stroke='%23ff6644' stroke-width='.8' opacity='.5'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#030308;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:grab}
+    body.dragging{cursor:grabbing}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #name{position:fixed;top:36px;left:50%;transform:translateX(-50%);color:rgba(255,150,100,.25);font-size:13px;letter-spacing:5px;font-weight:200;z-index:2;pointer-events:none}
+    #desc{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.08);font-size:9px;z-index:2;pointer-events:none;max-width:400px;text-align:center;letter-spacing:1px}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">DRAG TO ROTATE &middot; SCROLL TO ZOOM &middot; SPACE = NEXT</div>
+<div id="name">LORENZ</div>
+<div id="desc"></div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="nextAttractor()">Next</button>
+<button class="btn" style="bottom:16px;right:70px" onclick="resetTrail()">Reset</button>
+<button class="btn" style="bottom:16px;right:125px" onclick="speed=speed>=8?1:speed*2;this.textContent='Speed '+speed+'x'">Speed 1x</button>
+<button class="btn" style="bottom:16px;right:210px" onclick="multiMode=!multiMode;resetTrail();this.textContent=multiMode?'Multi ON':'Multi OFF'">Multi OFF</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// === ATTRACTORS ===
+const ATTRACTORS=[
+  {name:'LORENZ',desc:'Edward Lorenz, 1963. A butterfly in Beijing causes a tornado in Texas.',
+   params:{sigma:10,rho:28,beta:8/3},scale:8,
+   step:(p,dt,pr)=>{
+     const dx=pr.sigma*(p.y-p.x)*dt;
+     const dy=(p.x*(pr.rho-p.z)-p.y)*dt;
+     const dz=(p.x*p.y-pr.beta*p.z)*dt;
+     return{x:p.x+dx,y:p.y+dy,z:p.z+dz};},
+   init:()=>({x:.1,y:0,z:0})},
+  {name:'R\u00d6SSLER',desc:'Otto R\u00f6ssler, 1976. The simplest chaotic system with a single scroll.',
+   params:{a:.2,b:.2,c:5.7},scale:15,
+   step:(p,dt,pr)=>{
+     const dx=(-p.y-p.z)*dt;
+     const dy=(p.x+pr.a*p.y)*dt;
+     const dz=(pr.b+p.z*(p.x-pr.c))*dt;
+     return{x:p.x+dx,y:p.y+dy,z:p.z+dz};},
+   init:()=>({x:1,y:1,z:1})},
+  {name:'AIZAWA',desc:'Aizawa, 1982. A torus that breathes chaos.',
+   params:{a:.95,b:.7,c:.6,d:3.5,e:.25,f:.1},scale:200,
+   step:(p,dt,pr)=>{
+     const dx=((p.z-pr.b)*p.x-pr.d*p.y)*dt;
+     const dy=(pr.d*p.x+(p.z-pr.b)*p.y)*dt;
+     const dz=(pr.c+pr.a*p.z-p.z*p.z*p.z/3-(p.x*p.x+p.y*p.y)*(1+pr.e*p.z)+pr.f*p.z*p.x*p.x*p.x)*dt;
+     return{x:p.x+dx,y:p.y+dy,z:p.z+dz};},
+   init:()=>({x:.1,y:0,z:0})},
+  {name:'THOMAS',desc:'Ren\u00e9 Thomas, 1999. A system with no equilibrium points.',
+   params:{b:.208186},scale:60,
+   step:(p,dt,pr)=>{
+     const dx=(Math.sin(p.y)-pr.b*p.x)*dt;
+     const dy=(Math.sin(p.z)-pr.b*p.y)*dt;
+     const dz=(Math.sin(p.x)-pr.b*p.z)*dt;
+     return{x:p.x+dx,y:p.y+dy,z:p.z+dz};},
+   init:()=>({x:1.1,y:1.1,z:-0.01})},
+  {name:'HALVORSEN',desc:'Halvorsen. A three-winged symmetric attractor.',
+   params:{a:1.89},scale:15,
+   step:(p,dt,pr)=>{
+     const dx=(-pr.a*p.x-4*p.y-4*p.z-p.y*p.y)*dt;
+     const dy=(-pr.a*p.y-4*p.z-4*p.x-p.z*p.z)*dt;
+     const dz=(-pr.a*p.z-4*p.x-4*p.y-p.x*p.x)*dt;
+     return{x:p.x+dx,y:p.y+dy,z:p.z+dz};},
+   init:()=>({x:-1.48,y:-1.51,z:2.04})},
+  {name:'CHEN',desc:'Guanrong Chen, 1999. A dual-scroll attractor.',
+   params:{a:5,b:-10,c:-.38},scale:5,
+   step:(p,dt,pr)=>{
+     const dx=(pr.a*p.x-p.y*p.z)*dt;
+     const dy=(pr.b*p.y+p.x*p.z)*dt;
+     const dz=(pr.c*p.z+p.x*p.y/3)*dt;
+     return{x:p.x+dx,y:p.y+dy,z:p.z+dz};},
+   init:()=>({x:-3.2,y:1.3,z:2.4})},
+];
+
+let currentIdx=0,trail=[],speed=1,multiMode=false;
+let rxA=.4,ryA=0,zoom=1,dragging=false,lastMX=0,lastMY=0;
+let multiTrails=[];
+
+function getAttractor(){return ATTRACTORS[currentIdx];}
+
+function resetTrail(){
+  const a=getAttractor();
+  trail=[{...a.init()}];
+  if(multiMode){
+    multiTrails=[];
+    for(let i=0;i<5;i++){
+      const p=a.init();
+      p.x+=.001*(i+1);
+      multiTrails.push([{...p}]);
+    }
+  }
+  document.getElementById('name').textContent=a.name;
+  document.getElementById('desc').textContent=a.desc;
+}
+
+function nextAttractor(){
+  currentIdx=(currentIdx+1)%ATTRACTORS.length;
+  resetTrail();
+}
+
+resetTrail();
+
+// === INPUT ===
+C.addEventListener('mousedown',e=>{dragging=true;lastMX=e.clientX;lastMY=e.clientY;document.body.classList.add('dragging');});
+addEventListener('mousemove',e=>{if(!dragging)return;ryA+=(e.clientX-lastMX)*.005;rxA+=(e.clientY-lastMY)*.005;lastMX=e.clientX;lastMY=e.clientY;});
+addEventListener('mouseup',()=>{dragging=false;document.body.classList.remove('dragging');});
+addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.2,Math.min(5,zoom+(e.deltaY>0?-.1:.1)));},{passive:false});
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();nextAttractor();}
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='r')resetTrail();
+});
+// Touch
+let tDist=0;
+C.addEventListener('touchstart',e=>{if(e.touches.length===1){dragging=true;lastMX=e.touches[0].clientX;lastMY=e.touches[0].clientY;}
+  if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;tDist=Math.sqrt(dx*dx+dy*dy);}},{passive:true});
+C.addEventListener('touchmove',e=>{if(e.touches.length===1&&dragging){ryA+=(e.touches[0].clientX-lastMX)*.005;rxA+=(e.touches[0].clientY-lastMY)*.005;lastMX=e.touches[0].clientX;lastMY=e.touches[0].clientY;}
+  if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;const d=Math.sqrt(dx*dx+dy*dy);zoom=Math.max(.2,Math.min(5,zoom+(d-tDist)*.005));tDist=d;}},{passive:true});
+C.addEventListener('touchend',()=>{dragging=false;});
+
+// === 3D PROJECTION ===
+function rotX(p,a){const c=Math.cos(a),s=Math.sin(a);return{x:p.x,y:p.y*c-p.z*s,z:p.y*s+p.z*c};}
+function rotY(p,a){const c=Math.cos(a),s=Math.sin(a);return{x:p.x*c+p.z*s,y:p.y,z:-p.x*s+p.z*c};}
+function project(p){
+  const sc=getAttractor().scale*zoom;
+  const r1=rotX(p,rxA);const r2=rotY(r1,ryA);
+  const d=5+r2.z/sc;const s=300*zoom/Math.max(.1,d);
+  return{x:W/2+r2.x/sc*300*zoom,y:H/2-r2.y/sc*300*zoom,z:d};
+}
+
+// === RENDER ===
+function drawTrail(tr,hueBase,alpha){
+  if(tr.length<2)return;
+  const projected=tr.map(p=>project(p));
+  for(let i=1;i<projected.length;i++){
+    const age=i/projected.length;
+    const p1=projected[i-1],p2=projected[i];
+    const depth=Math.max(0,Math.min(1,(p2.z-2)/6));
+    X.globalAlpha=age*alpha*(.2+depth*.5);
+    X.strokeStyle='hsl('+(hueBase+age*60)+',70%,'+(40+depth*25)+'%)';
+    X.lineWidth=.3+depth*.8;
+    X.beginPath();X.moveTo(p1.x,p1.y);X.lineTo(p2.x,p2.y);X.stroke();
+  }
+  // Head glow
+  const head=projected[projected.length-1];
+  X.globalAlpha=alpha*.3;X.fillStyle='hsl('+hueBase+',80%,70%)';
+  X.beginPath();X.arc(head.x,head.y,3,0,Math.PI*2);X.fill();
+}
+
+function anim(){requestAnimationFrame(anim);
+  X.fillStyle='rgba(3,3,8,.06)';X.fillRect(0,0,W,H);
+
+  const a=getAttractor();
+  const dt=.005;
+
+  // Step
+  for(let s=0;s<speed*3;s++){
+    const last=trail[trail.length-1];
+    const next=a.step(last,dt,a.params);
+    if(isFinite(next.x)&&isFinite(next.y)&&isFinite(next.z))trail.push(next);
+    if(trail.length>8000)trail.shift();
+
+    if(multiMode){
+      for(let m=0;m<multiTrails.length;m++){
+        const mLast=multiTrails[m][multiTrails[m].length-1];
+        const mNext=a.step(mLast,dt,a.params);
+        if(isFinite(mNext.x))multiTrails[m].push(mNext);
+        if(multiTrails[m].length>8000)multiTrails[m].shift();
+      }
+    }
+  }
+
+  // Auto rotate slowly
+  if(!dragging)ryA+=.003;
+
+  // Draw
+  drawTrail(trail,20,.8);
+  if(multiMode){
+    const hues=[180,120,280,60,330];
+    for(let m=0;m<multiTrails.length;m++){
+      drawTrail(multiTrails[m],hues[m],.4);
+    }
+  }
+
+  X.globalAlpha=1;
+  document.getElementById('stats').textContent=
+    'points: '+trail.length+'\n'+(currentIdx+1)+'/'+ATTRACTORS.length+'\nzoom: '+zoom.toFixed(1)+'x';
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="attractor.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
