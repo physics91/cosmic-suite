@@ -46,7 +46,10 @@ function startGame(){
   document.getElementById('hint').textContent='click to boost outward';}
 
 function gameOver(reason){
-  state='dead';
+  state='dead';ship.alive=false;
+  // Death flash
+  if(reason.includes('CRASH')){X.fillStyle='rgba(255,50,30,.3)';X.fillRect(0,0,W,H);}
+  else{X.fillStyle='rgba(0,0,30,.5)';X.fillRect(0,0,W,H);}
   games++;localStorage.setItem('orbit_games',''+games);
   if(score>bestScore){bestScore=score;localStorage.setItem('orbit_best',''+bestScore);}
   document.getElementById('msg').textContent='ORBIT LOST\n'+reason+'\nSCORE: '+score+(score>=bestScore&&score>0?'\nNEW BEST!':'')+'\n\nclick to retry';
