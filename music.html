@@ -201,6 +201,7 @@ function anim(){requestAnimationFrame(anim);
   let lastNote='';for(const s of stars){if(s.glow>.5){const i=s.getNoteInfo();lastNote=noteNames[i.note%12]+Math.floor(i.note/12-1);}}
   $('info').textContent=stars.length?stars.length+' STARS · '+$('scaleSelect').value.toUpperCase():'CLICK TO PLACE STARS · THEY BECOME NOTES'+(lastNote?' · ♪ '+lastNote:'');}
 anim();
+addEventListener("keydown",e=>{if(e.key==="f"&&!e.target.closest("input"))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
 </body>

@@ -172,6 +172,7 @@ function render(){requestAnimationFrame(render);
   const alt=state==='play'?Math.round(Math.sqrt((ship.x-stars[0].x)**2+(ship.y-stars[0].y)**2)):0;
   document.getElementById('hint').textContent=state==='play'?'LEVEL '+level+(boosting?' · BOOST':'')+(alt?' · ALT '+alt:''):'';}
 render();
+addEventListener("keydown",e=>{if(e.key==="f"&&!e.target.closest("input"))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
 </body>
