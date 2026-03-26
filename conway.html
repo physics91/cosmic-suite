@@ -32,7 +32,7 @@
 const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;
 const CELL=4;
-let cols,rows,grid,glow;
+let cols,rows,grid,glow,age;
 let running=true,gen=0,speed=1,population=0;
 
 function resize(){
@@ -40,8 +40,9 @@ function resize(){
   cols=Math.ceil(W/CELL);rows=Math.ceil(H/CELL);
   const newGrid=new Uint8Array(cols*rows);
   const newGlow=new Float32Array(cols*rows);
+  const newAge=new Uint16Array(cols*rows);
   if(grid){for(let y=0;y<Math.min(rows,(grid.length/cols)|0);y++)for(let x=0;x<Math.min(cols,grid.length);x++){const i=y*cols+x;if(i<newGrid.length&&y*cols+x<grid.length){newGrid[i]=grid[y*cols+x]||0;}}}
-  grid=newGrid;glow=newGlow;
+  grid=newGrid;glow=newGlow;age=newAge;
 }
 resize();addEventListener('resize',resize);
 
@@ -62,10 +63,12 @@ function step(){
       if(alive){
         next[i]=(neighbors===2||neighbors===3)?1:0;
         if(!next[i])glow[i]=1; // death glow
+        else age[i]++; // survivor ages
       }else{
         next[i]=neighbors===3?1:0;
-        if(next[i])glow[i]=1; // birth glow
+        if(next[i]){glow[i]=1;age[i]=0;} // birth glow, reset age
       }
+      if(!next[i])age[i]=0;
       if(next[i])population++;
     }
   }
@@ -170,11 +173,12 @@ function render(){
     const alive=grid[i];
     const g=glow[i];
     if(alive){
-      // Living cell — green-white based on glow
+      // Living cell — age colors: young=green, old=deep blue
       const bright=g>.5;
-      d[pi]=bright?180:40;
-      d[pi+1]=bright?255:200;
-      d[pi+2]=bright?180:100;
+      const a=Math.min(100,age[i]);const af=a/100;
+      d[pi]=bright?180:Math.floor(30+af*60);
+      d[pi+1]=bright?255:Math.floor(200-af*120);
+      d[pi+2]=bright?180:Math.floor(80+af*140);
       d[pi+3]=255;
     }else if(g>.01){
       // Death afterglow — fading amber
