@@ -39,6 +39,7 @@
   <button class="btn active" id="btnPlay" onclick="togglePlay()">Play</button>
   <button class="btn" onclick="clearStars()">Clear</button>
   <button class="btn" onclick="randomize()">Random</button>
+  <button class="btn" onclick="tapTempo()">Tap BPM</button>
   <button class="btn" onclick="exportMidi()">Export</button>
 </div>
 <canvas id="c"></canvas>
@@ -138,6 +139,12 @@ function togglePlay(){playing=!playing;$('btnPlay').classList.toggle('active',pl
 function clearStars(){stars=[];}
 function randomize(){clearStars();const n=12+Math.random()*20|0;
   for(let i=0;i<n;i++)stars.push(new MusicStar(Math.random()*W,Math.random()*H));}
+// Tap tempo
+let tapTimes=[];
+function tapTempo(){const now=performance.now();tapTimes.push(now);if(tapTimes.length>5)tapTimes.shift();
+  if(tapTimes.length>=2){const avg=tapTimes.reduce((a,t,i,arr)=>i>0?a+(t-arr[i-1]):a,0)/(tapTimes.length-1);
+    bpm=Math.round(60000/avg);bpm=Math.max(40,Math.min(200,bpm));$('bpmSlider').value=bpm;$('bpmVal').textContent=bpm;}}
+
 function exportMidi(){
   const notes=stars.map(s=>{const info=s.getNoteInfo();return{beat:info.col,note:info.note,vel:info.vel};});
   navigator.clipboard.writeText(JSON.stringify(notes,null,1)).then(()=>alert('Note data copied to clipboard!')).catch(()=>{});}
