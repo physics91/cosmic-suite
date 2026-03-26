@@ -124,7 +124,7 @@ function anim(){requestAnimationFrame(anim);
     const speedNorm=Math.min(1,spd/6);
     const colorIdx=Math.min(colors.length-1,(speedNorm*colors.length)|0);
     artX.globalAlpha=.3+speedNorm*.5;artX.fillStyle=colors[colorIdx];
-    artX.fillRect(p.x,p.y,1,1);}
+    const sz=.5+speedNorm*1.5;artX.beginPath();artX.arc(p.x,p.y,sz,0,Math.PI*2);artX.fill();}
   artX.globalAlpha=1;
   // UI overlay — wells
   uiX.clearRect(0,0,W,H);
