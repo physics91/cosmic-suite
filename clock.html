@@ -95,6 +95,10 @@ function anim(){requestAnimationFrame(anim);
   const pad=n=>n.toString().padStart(2,'0');
   document.getElementById('time').textContent=pad(h)+':'+pad(m)+':'+pad(s);
   const days=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  // Moon phase
+  const jd=Math.floor(365.25*(now.getFullYear()+4716))+Math.floor(30.6001*(now.getMonth()+2))+now.getDate()-1524.5;
+  const moonAge=((jd-2451550.1)/29.530588853)%1;const moonPhase=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'][Math.floor(moonAge*8)%8];
+  X.globalAlpha=.08;X.font='16px sans-serif';X.textAlign='center';X.fillText(moonPhase,cx,cy+R+40);
   if(tick&&s!==lastSec){lastSec=s;try{const a=new(AudioContext||webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=s%2?800:600;o.type='sine';g.gain.setValueAtTime(.008,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.05);o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.05);}catch(e){}}
   const greet=h<6?'the stars are yours':h<12?'good morning, stargazer':h<18?'the cosmos turns':' the night welcomes you';
   document.getElementById('date').textContent=days[now.getDay()]+' '+now.getFullYear()+'.'+pad(now.getMonth()+1)+'.'+pad(now.getDate())+' · '+greet;}
