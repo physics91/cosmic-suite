@@ -150,9 +150,13 @@ function anim(){requestAnimationFrame(anim);
   grad.addColorStop(1,'rgba(0,0,0,0)');
   X.globalAlpha=.6;X.fillStyle=grad;X.beginPath();X.arc(cx,cy,mainR*2,0,Math.PI*2);X.fill();
 
-  // Inner circle
+  // Inner circle with segment glow
   X.globalAlpha=.12;X.strokeStyle=`rgba(${th2.color},1)`;X.lineWidth=1.5;
   X.beginPath();X.arc(cx,cy,mainR,0,Math.PI*2);X.stroke();
+  // Glowing segment
+  if(active){X.globalAlpha=.2;X.strokeStyle=th2.accent;X.lineWidth=3;
+    const segAngle=Math.PI/4;const segStart=-Math.PI/2+progress*Math.PI*2;
+    X.beginPath();X.arc(cx,cy,mainR,segStart,segStart+segAngle);X.stroke();}
 
   // Progress arc
   if(active){X.globalAlpha=.25;X.strokeStyle=th2.accent;X.lineWidth=2;
