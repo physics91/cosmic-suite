@@ -29,7 +29,7 @@ resize();addEventListener('resize',resize);
 // Game state
 let state='menu',score=0,bestScore=+(localStorage.getItem('orbit_best')||0),bestLevel=+(localStorage.getItem('orbit_blvl')||1),level=1,games=+(localStorage.getItem('orbit_games')||0);
 let ship={x:0,y:0,vx:0,vy:0,trail:[],alive:true,fuel:100},combo=0,comboTimer=0;
-let stars=[],collectibles=[],particles=[];
+let stars=[],collectibles=[],particles=[],survivalTime=0;
 let shakeAmt=0,slowmo=1;
 
 document.getElementById('best').textContent=(bestScore?'BEST: '+bestScore+' · LVL '+bestLevel:'')+(games?' · '+games+' GAMES':'');
@@ -119,7 +119,7 @@ function update(){
   // Particles
   for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life--;p.vx*=.95;p.vy*=.95;}
   particles=particles.filter(p=>p.life>0);
-  comboTimer--;if(comboTimer<=0)combo=0;
+  survivalTime+=1/60;comboTimer--;if(comboTimer<=0)combo=0;
   if(Math.random()<.02)score++;
   // Shake decay
   if(shakeAmt>0)shakeAmt*=.9;}
@@ -172,7 +172,7 @@ function render(){requestAnimationFrame(render);
   for(const p of particles){X.globalAlpha=(p.life/20)*.5;X.fillStyle=p.color;
     X.beginPath();X.arc(p.x,p.y,1.5,0,Math.PI*2);X.fill();}
   X.globalAlpha=1;X.restore();
-  document.getElementById('score').textContent=score;
+  document.getElementById('score').textContent=score+(state==='play'?' · '+Math.floor(survivalTime)+'s':'');
   const alt=state==='play'?Math.round(Math.sqrt((ship.x-stars[0].x)**2+(ship.y-stars[0].y)**2)):0;
   document.getElementById('hint').textContent=state==='play'?'LEVEL '+level+(boosting?' · BOOST':'')+(alt?' · ALT '+alt:'')+(combo>1?' · x'+combo+' COMBO':''):'';}
 render();
