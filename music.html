@@ -185,6 +185,9 @@ function anim(){requestAnimationFrame(anim);
     const ph=$('playhead');ph.style.left=(playPos/16*100)+'%';}
   // Stars
   for(const s of stars){s.update();s.draw(X);}
+  // Column density dots
+  for(let col=0;col<16;col++){let count=0;for(const s of stars){if(s.getNoteInfo().col===col)count++;}
+    if(count)for(let d=0;d<Math.min(count,5);d++){X.globalAlpha=.08;X.fillStyle='#ffcc44';X.beginPath();X.arc(col*W/16+W/32,H-8-d*4,1.5,0,Math.PI*2);X.fill();}}
   // Playhead column highlight
   if(playing){X.globalAlpha=.03;X.fillStyle='#ffcc44';X.fillRect(playPos*W/16,0,W/16,H);}
   // Scale guide — highlight root note rows
