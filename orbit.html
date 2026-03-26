@@ -110,7 +110,9 @@ function update(){
       // Burst particles
       for(let i=0;i<8;i++){const a=i*Math.PI/4;particles.push({x:c.x,y:c.y,vx:Math.cos(a)*3,vy:Math.sin(a)*3,life:20,color:'#ffcc44'});}
       // Level up
-      if(score%5===0){level++;spawnCollectible();if(score%10===0)addStar();}}}
+      if(score%5===0){level++;spawnCollectible();shakeAmt=5;
+        X.fillStyle='rgba(68,170,255,.1)';X.fillRect(0,0,W,H);
+        if(score%10===0)addStar();}}}
   // Remove collected, spawn new
   collectibles=collectibles.filter(c=>!c.collected);
   if(collectibles.length<3)spawnCollectible();
