@@ -133,6 +133,7 @@ C.addEventListener('contextmenu',e=>{e.preventDefault();
   if(best>=0)stars.splice(best,1);});
 
 $('bpmSlider').oninput=function(){bpm=+this.value;$('bpmVal').textContent=bpm;};
+addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();togglePlay();}if(e.key==='r')randomize();if(e.key==='c')clearStars();if(e.key==='t')tapTempo();});
 function $(id){return document.getElementById(id);}
 
 function togglePlay(){playing=!playing;$('btnPlay').classList.toggle('active',playing);$('btnPlay').textContent=playing?'Pause':'Play';}
