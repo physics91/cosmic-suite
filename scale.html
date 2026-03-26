@@ -55,12 +55,13 @@ const OBJECTS=[
   [26,'OBSERVABLE UNIVERSE','~10²⁶ m','93 billion light years across. 2 trillion galaxies. Everything we can see.','#444466','sphere'],
 ];
 
-let currentPower=0,targetPower=0;
+let currentPower=0,targetPower=0,autoScroll=false,autoDir=1;
 
 addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowRight'){targetPower=Math.min(26,targetPower+1);}
   if(e.key==='ArrowUp'||e.key==='ArrowLeft'){targetPower=Math.max(-15,targetPower-1);}
   if(e.key==='Home'||e.key==='0'){targetPower=0;}if(e.key==='End'){targetPower=26;}
-  if(e.key==='PageDown'){targetPower=Math.min(26,targetPower+5);}if(e.key==='PageUp'){targetPower=Math.max(-15,targetPower-5);}});
+  if(e.key==='PageDown'){targetPower=Math.min(26,targetPower+5);}if(e.key==='PageUp'){targetPower=Math.max(-15,targetPower-5);}
+  if(e.key==='a'){autoScroll=!autoScroll;}});
 addEventListener('wheel',e=>{e.preventDefault();targetPower+=e.deltaY>0?1:-1;
   targetPower=Math.max(-15,Math.min(26,targetPower));},{passive:false});
 
@@ -76,6 +77,7 @@ function getCurrentObject(){
   return best;}
 
 function anim(){requestAnimationFrame(anim);
+  if(autoScroll){targetPower+=autoDir*.015;if(targetPower>26){autoDir=-1;}if(targetPower<-15){autoDir=1;}}
   currentPower+=(targetPower-currentPower)*.08;
   X.fillStyle='rgba(5,5,8,.15)';X.fillRect(0,0,W,H);
   const obj=getCurrentObject();const cx=W/2,cy=H/2;
