@@ -44,12 +44,31 @@ const FACES=[
   {sym:'🦋',name:'THE BUTTERFLY',msg:'Transformation. Who you were is not who you must be.'},
 ];
 
-let rolling=false,history=[];
+let rolling=false,history=[],shockwaves=[],totalRolls=0;
 
 function roll(){
-  if(rolling)return;rolling=true;
+  if(rolling)return;rolling=true;totalRolls++;
   const el=document.getElementById('dice');el.classList.remove('roll');
   void el.offsetWidth;el.classList.add('roll');
+  // Bounce the dice element with physics
+  let bounceY=0,bounceVY=-8,bounceFrame=0;
+  const bounceAnim=()=>{
+    bounceVY+=.4;bounceY+=bounceVY;
+    if(bounceY>0){bounceY=0;bounceVY*=-.5;
+      // Bounce impact shockwave on canvas
+      shockwaves.push({x:C.width/2,y:C.height/2+50,r:0,life:1});
+      // Bounce sound
+      try{const a=new(AudioContext||webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();
+        o.type='sine';o.frequency.value=150+Math.random()*100;
+        g.gain.setValueAtTime(.015,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.1);
+        o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.1);}catch(e){}
+    }
+    el.style.transform='translateY('+bounceY+'px)';
+    bounceFrame++;
+    if(bounceFrame<40||Math.abs(bounceVY)>.5)requestAnimationFrame(bounceAnim);
+    else el.style.transform='';
+  };
+  bounceAnim();
   // Rapid symbol changes during roll
   let count=0;const interval=setInterval(()=>{
     el.textContent=FACES[Math.random()*FACES.length|0].sym;count++;
@@ -60,6 +79,8 @@ function roll(){
       document.getElementById('result').textContent=face.msg;
       history.unshift(face.sym);if(history.length>8)history.pop();
       document.getElementById('history').textContent=history.join('\n');
+      // Big reveal shockwave
+      shockwaves.push({x:C.width/2,y:C.height/2,r:0,life:1,big:true});
       // Sound
       try{const a=new(AudioContext||webkitAudioContext)();
         [400,500,600].forEach((f,i)=>{const o=a.createOscillator(),g=a.createGain();o.type='sine';o.frequency.value=f;
@@ -83,7 +104,17 @@ function resize(){C.width=innerWidth;C.height=innerHeight;}resize();addEventList
 const stars=Array.from({length:80},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
 function anim(){requestAnimationFrame(anim);X.fillStyle='rgba(6,6,16,.05)';X.fillRect(0,0,C.width,C.height);
   for(const s of stars){s.p+=.003;X.globalAlpha=.04+Math.sin(s.p)*.02;X.fillStyle='#fff';
-    X.beginPath();X.arc(s.x%C.width,s.y%C.height,s.s,0,Math.PI*2);X.fill();}X.globalAlpha=1;}
+    X.beginPath();X.arc(s.x%C.width,s.y%C.height,s.s,0,Math.PI*2);X.fill();}
+  // Shockwaves
+  for(let i=shockwaves.length-1;i>=0;i--){
+    const sw=shockwaves[i];sw.r+=sw.big?8:4;sw.life-=sw.big?.015:.025;
+    if(sw.life<=0){shockwaves.splice(i,1);continue;}
+    X.globalAlpha=sw.life*(sw.big?.15:.08);
+    X.strokeStyle=sw.big?'rgba(255,200,100,.5)':'rgba(255,255,255,.3)';
+    X.lineWidth=sw.big?2:1;
+    X.beginPath();X.arc(sw.x,sw.y,sw.r,0,Math.PI*2);X.stroke();
+  }
+  X.globalAlpha=1;}
 anim();
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="dice.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
