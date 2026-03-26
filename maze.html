@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maze</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='8' y='8' width='16' height='16' fill='none' stroke='%2388aaff' stroke-width='.5' opacity='.4'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#030308;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">ARROW KEYS TO MOVE &middot; SPACE = NEW MAZE &middot; S = SOLVE</div>
+<div id="stats"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="generate()">New Maze</button>
+<button class="btn" style="bottom:16px;right:100px" onclick="solve()">Solve</button>
+<button class="btn" style="bottom:16px;right:155px" onclick="cycleSize()">Size: <span id="szV">20</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="portal.html" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>document.getElementById('random-jump').onclick=function(){const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chaos-map.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','fractal.html','gravity-beats.html','gravity-life.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','orbits.html','order.html','pendulum.html','pi.html','puzzle.html','quine.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','sorting.html','spirograph.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false;};</script>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+let mazeW=20,mazeH=20;
+let walls,visited,playerX=0,playerY=0,steps=0,solved=false;
+let solvePath=[],solveIdx=0,solving=false;
+
+// Walls: for cell (x,y), walls[y*mazeW+x] = {N,S,E,W}
+function generate(){
+  walls=[];visited=[];solvePath=[];solveIdx=0;solving=false;solved=false;steps=0;
+  for(let i=0;i<mazeW*mazeH;i++){walls[i]={N:true,S:true,E:true,W:true};visited[i]=false;}
+  // DFS maze generation
+  const stack=[];let cx=0,cy=0;visited[0]=true;let visitCount=1;
+  while(visitCount<mazeW*mazeH){
+    const neighbors=[];
+    if(cy>0&&!visited[(cy-1)*mazeW+cx])neighbors.push({x:cx,y:cy-1,d:'N',o:'S'});
+    if(cy<mazeH-1&&!visited[(cy+1)*mazeW+cx])neighbors.push({x:cx,y:cy+1,d:'S',o:'N'});
+    if(cx<mazeW-1&&!visited[cy*mazeW+cx+1])neighbors.push({x:cx+1,y:cy,d:'E',o:'W'});
+    if(cx>0&&!visited[cy*mazeW+cx-1])neighbors.push({x:cx-1,y:cy,d:'W',o:'E'});
+    if(neighbors.length>0){
+      const n=neighbors[Math.random()*neighbors.length|0];
+      stack.push({x:cx,y:cy});
+      walls[cy*mazeW+cx][n.d]=false;
+      walls[n.y*mazeW+n.x][n.o]=false;
+      cx=n.x;cy=n.y;visited[cy*mazeW+cx]=true;visitCount++;
+    }else{const prev=stack.pop();cx=prev.x;cy=prev.y;}
+  }
+  playerX=0;playerY=0;
+}
+
+function solve(){
+  // BFS to find path
+  solvePath=[];solveIdx=0;solving=true;
+  const prev=new Array(mazeW*mazeH).fill(-1);
+  const q=[0];const vis2=new Uint8Array(mazeW*mazeH);vis2[0]=1;
+  const target=mazeH*mazeW-1;
+  while(q.length){
+    const cur=q.shift();if(cur===target)break;
+    const cx2=cur%mazeW,cy2=Math.floor(cur/mazeW);
+    const w=walls[cur];
+    const dirs=[{d:'N',dx:0,dy:-1},{d:'S',dx:0,dy:1},{d:'E',dx:1,dy:0},{d:'W',dx:-1,dy:0}];
+    for(const dir of dirs){
+      if(w[dir.d])continue;
+      const nx=cx2+dir.dx,ny=cy2+dir.dy;
+      if(nx<0||nx>=mazeW||ny<0||ny>=mazeH)continue;
+      const ni=ny*mazeW+nx;
+      if(vis2[ni])continue;
+      vis2[ni]=1;prev[ni]=cur;q.push(ni);
+    }
+  }
+  // Reconstruct path
+  let cur2=target;
+  while(cur2!==-1&&cur2!==0){solvePath.unshift(cur2);cur2=prev[cur2];}
+  solvePath.unshift(0);
+}
+
+function cycleSize(){mazeW=mazeW>=40?10:mazeW+5;mazeH=mazeW;document.getElementById('szV').textContent=mazeW;generate();}
+
+// Input
+addEventListener('keydown',e=>{
+  if(solved)return;
+  let dx=0,dy=0;
+  if(e.key==='ArrowUp'){dy=-1;e.preventDefault();}
+  if(e.key==='ArrowDown'){dy=1;e.preventDefault();}
+  if(e.key==='ArrowLeft'){dx=-1;e.preventDefault();}
+  if(e.key==='ArrowRight'){dx=1;e.preventDefault();}
+  if(e.key===' '){e.preventDefault();generate();return;}
+  if(e.key==='s'){solve();return;}
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(dx===0&&dy===0)return;
+  const w=walls[playerY*mazeW+playerX];
+  if(dx===1&&!w.E){playerX++;steps++;}
+  if(dx===-1&&!w.W){playerX--;steps++;}
+  if(dy===1&&!w.S){playerY++;steps++;}
+  if(dy===-1&&!w.N){playerY--;steps++;}
+  if(playerX===mazeW-1&&playerY===mazeH-1)solved=true;
+});
+
+// Touch swipe
+let tx=0,ty=0;
+addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;
+  if(Math.abs(dx)>Math.abs(dy)){
+    if(dx>30)dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight'}));
+    if(dx<-30)dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft'}));
+  }else{
+    if(dy>30)dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown'}));
+    if(dy<-30)dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp'}));
+  }
+},{passive:true});
+
+generate();
+
+// === RENDER ===
+function anim(){requestAnimationFrame(anim);
+  X.fillStyle='rgba(3,3,8,.3)';X.fillRect(0,0,W,H);
+
+  const margin=40;
+  const cellW=(W-margin*2)/mazeW;
+  const cellH=(H-margin*2)/mazeH;
+  const ox=margin,oy=margin;
+
+  // Solve animation
+  if(solving&&solveIdx<solvePath.length){solveIdx+=.5;}
+
+  // Draw cells
+  for(let y=0;y<mazeH;y++){
+    for(let x=0;x<mazeW;x++){
+      const cx2=ox+x*cellW,cy2=oy+y*cellH;
+      const w=walls[y*mazeW+x];
+
+      // Solution path glow
+      const inPath=solving&&solvePath.slice(0,Math.floor(solveIdx)).includes(y*mazeW+x);
+      if(inPath){
+        X.globalAlpha=.06;X.fillStyle='#44aaff';
+        X.fillRect(cx2+1,cy2+1,cellW-2,cellH-2);
+      }
+
+      // Walls
+      X.globalAlpha=.2;X.strokeStyle='#4466aa';X.lineWidth=1;
+      if(w.N){X.beginPath();X.moveTo(cx2,cy2);X.lineTo(cx2+cellW,cy2);X.stroke();}
+      if(w.S){X.beginPath();X.moveTo(cx2,cy2+cellH);X.lineTo(cx2+cellW,cy2+cellH);X.stroke();}
+      if(w.E){X.beginPath();X.moveTo(cx2+cellW,cy2);X.lineTo(cx2+cellW,cy2+cellH);X.stroke();}
+      if(w.W){X.beginPath();X.moveTo(cx2,cy2);X.lineTo(cx2,cy2+cellH);X.stroke();}
+    }
+  }
+
+  // Start (green) and end (gold)
+  X.globalAlpha=.15;X.fillStyle='#44ff88';
+  X.fillRect(ox+1,oy+1,cellW-2,cellH-2);
+  X.globalAlpha=.15;X.fillStyle='#ffcc44';
+  X.fillRect(ox+(mazeW-1)*cellW+1,oy+(mazeH-1)*cellH+1,cellW-2,cellH-2);
+
+  // Player
+  const px=ox+playerX*cellW+cellW/2,py=oy+playerY*cellH+cellH/2;
+  X.globalAlpha=.15;X.fillStyle='#fff';
+  X.beginPath();X.arc(px,py,Math.min(cellW,cellH)*.4,0,Math.PI*2);X.fill();
+  X.globalAlpha=.7;X.fillStyle='#fff';
+  X.beginPath();X.arc(px,py,Math.min(cellW,cellH)*.15,0,Math.PI*2);X.fill();
+
+  // Win message
+  if(solved){
+    X.globalAlpha=.3;X.fillStyle='#ffcc44';X.font='20px sans-serif';X.textAlign='center';
+    X.fillText('\u2605 ESCAPED IN '+steps+' STEPS \u2605',W/2,H/2);
+  }
+
+  X.globalAlpha=1;
+  document.getElementById('stats').textContent=
+    'maze: '+mazeW+'\u00d7'+mazeH+'\nsteps: '+steps+(solved?' \u2713':'')+(solving?' \u00b7 solving':'');
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="maze.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
