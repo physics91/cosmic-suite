@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cellular Music</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><rect x='12' y='8' width='2' height='2' fill='%23ffcc44' opacity='.5'/><rect x='16' y='10' width='2' height='2' fill='%23ffcc44' opacity='.4'/><rect x='14' y='12' width='2' height='2' fill='%23ffcc44' opacity='.3'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#040408;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none;text-align:center}
+    #rule-display{position:fixed;top:36px;left:50%;transform:translateX(-50%);color:rgba(255,200,100,.25);font-size:14px;letter-spacing:4px;font-weight:200;z-index:2;pointer-events:none}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+    .btn.active{background:rgba(255,200,100,.1);border-color:rgba(255,200,100,.3)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">CELLULAR AUTOMATA \u00d7 MUSIC &middot; RULES BECOME MELODIES</div>
+<div id="rule-display">RULE 90</div>
+<div id="stats"></div>
+<button class="btn active" style="bottom:16px;right:16px" id="btnPlay" onclick="togglePlay()">Playing</button>
+<button class="btn" style="bottom:16px;right:90px" onclick="nextRule()">Next Rule</button>
+<button class="btn" style="bottom:16px;right:175px" onclick="cycleScale()">Scale: <span id="scName">Pentatonic</span></button>
+<button class="btn" style="bottom:16px;right:310px" onclick="cycleTempo()">BPM: <span id="bpmV">120</span></button>
+<button class="btn" style="bottom:16px;right:400px" onclick="reset()">Reset</button>
+<button class="btn" style="bottom:40px;right:16px" onclick="cycleVoices()">Cells: <span id="cellV">16</span></button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
+resize();addEventListener('resize',resize);
+
+// === CELLULAR AUTOMATA ===
+const RULES=[90,30,110,150,60,45,73,105,126,22];
+const RULE_NAMES=['Sierpinski Melody','Chaos Jazz','Turing Symphony','Additive Choir','Left Cascade','Complex Weave','Nested Bells','XOR Harmony','Symmetric Flow','Fractal Hymn'];
+let ruleIdx=0,rule=90;
+let numCells=16,grid,generation=0;
+let history=[];const MAX_HISTORY=80;
+
+function applyRule(l,c,r){return(rule>>((l<<2)|(c<<1)|r))&1;}
+
+function initGrid(){
+  grid=new Uint8Array(numCells);
+  grid[Math.floor(numCells/2)]=1;
+  history=[];generation=0;
+}
+
+function stepAutomata(){
+  history.push([...grid]);
+  if(history.length>MAX_HISTORY)history.shift();
+  const next=new Uint8Array(numCells);
+  for(let i=0;i<numCells;i++){
+    next[i]=applyRule(grid[(i-1+numCells)%numCells],grid[i],grid[(i+1)%numCells]);
+  }
+  grid=next;generation++;
+}
+
+// === MUSIC ===
+const SCALES={
+  pentatonic:[0,2,4,7,9],
+  minor:[0,2,3,5,7,8,10],
+  major:[0,2,4,5,7,9,11],
+  dorian:[0,2,3,5,7,9,10],
+  japanese:[0,1,5,7,8],
+};
+const scaleKeys=Object.keys(SCALES);
+let scaleIdx=0,currentScale='pentatonic';
+let bpm=120,playing=true;
+let aC=null,masterGain=null,reverb=null;
+
+function initAudio(){
+  if(aC)return;
+  aC=new(AudioContext||webkitAudioContext)();
+  masterGain=aC.createGain();masterGain.gain.value=.12;
+  // Reverb
+  reverb=aC.createConvolver();
+  const r=aC.sampleRate,l=r*2,buf=aC.createBuffer(2,l,r);
+  for(let c=0;c<2;c++){const d=buf.getChannelData(c);for(let i=0;i<l;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/l,2.5);}
+  reverb.buffer=buf;
+  const rvG=aC.createGain();rvG.gain.value=.3;
+  masterGain.connect(aC.destination);
+  masterGain.connect(reverb);reverb.connect(rvG);rvG.connect(aC.destination);
+}
+
+function cellToFreq(cellIdx){
+  const scale=SCALES[currentScale];
+  const octave=Math.floor(cellIdx/scale.length);
+  const note=scale[cellIdx%scale.length];
+  const midi=48+octave*12+note; // C3 base
+  return 440*Math.pow(2,(midi-69)/12);
+}
+
+function playGeneration(){
+  if(!aC)initAudio();
+  const t=aC.currentTime;
+  let notesPlayed=0;
+  for(let i=0;i<numCells;i++){
+    if(!grid[i])continue;
+    notesPlayed++;
+    const freq=cellToFreq(i);
+    const o=aC.createOscillator(),g=aC.createGain();
+    o.type=i%3===0?'sine':i%3===1?'triangle':'sine';
+    o.frequency.value=freq;
+    const vel=.03/(notesPlayed*.3+1); // quieter when many notes
+    g.gain.setValueAtTime(vel,t);
+    g.gain.exponentialRampToValueAtTime(.0001,t+.4);
+    o.connect(g);g.connect(masterGain);
+    o.start(t);o.stop(t+.5);
+  }
+}
+
+// === CONTROLS ===
+function nextRule(){ruleIdx=(ruleIdx+1)%RULES.length;rule=RULES[ruleIdx];document.getElementById('rule-display').textContent='RULE '+rule;initGrid();}
+function cycleScale(){scaleIdx=(scaleIdx+1)%scaleKeys.length;currentScale=scaleKeys[scaleIdx];document.getElementById('scName').textContent=currentScale.charAt(0).toUpperCase()+currentScale.slice(1);}
+function cycleTempo(){bpm=bpm>=200?60:bpm+20;document.getElementById('bpmV').textContent=bpm;}
+function cycleVoices(){numCells=numCells>=32?8:numCells+4;document.getElementById('cellV').textContent=numCells;initGrid();}
+function togglePlay(){playing=!playing;document.getElementById('btnPlay').textContent=playing?'Playing':'Paused';document.getElementById('btnPlay').classList.toggle('active',playing);}
+function reset(){initGrid();}
+
+initGrid();
+
+addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();togglePlay();}
+  if(e.key==='ArrowRight')nextRule();
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+});
+
+// === RENDER ===
+let lastBeat=0;
+function anim(){requestAnimationFrame(anim);
+  const now=performance.now();
+  const beatInterval=60000/bpm;
+
+  X.fillStyle='rgba(4,4,8,.06)';X.fillRect(0,0,W,H);
+
+  // Advance on beat
+  if(playing&&now-lastBeat>beatInterval){
+    lastBeat=now;
+    if(aC||playing)initAudio();
+    playGeneration();
+    stepAutomata();
+  }
+
+  const cx=W/2,cy=H/2;
+  const cellW=W/numCells;
+
+  // Draw history (scrolling up)
+  for(let row=0;row<history.length;row++){
+    const gen=history[row];
+    const y=H-(history.length-row)*(H/MAX_HISTORY);
+    const age=row/history.length;
+    for(let i=0;i<gen.length;i++){
+      if(!gen[i])continue;
+      const x=i*cellW;
+      const hue=30+(i/numCells)*60;
+      X.globalAlpha=.05+age*.15;
+      X.fillStyle='hsl('+hue+',70%,55%)';
+      X.fillRect(x,y,cellW-1,H/MAX_HISTORY-1);
+    }
+  }
+
+  // Draw current generation (bottom, brighter)
+  const curY=H-H/MAX_HISTORY;
+  for(let i=0;i<numCells;i++){
+    const x=i*cellW;
+    if(grid[i]){
+      const hue=30+(i/numCells)*60;
+      // Glow
+      X.globalAlpha=.15;X.fillStyle='hsl('+hue+',80%,60%)';
+      X.fillRect(x-2,curY-2,cellW+3,H/MAX_HISTORY+3);
+      // Cell
+      X.globalAlpha=.8;
+      X.fillRect(x,curY,cellW-1,H/MAX_HISTORY-1);
+    }else{
+      X.globalAlpha=.02;X.fillStyle='#fff';
+      X.fillRect(x,curY,cellW-1,H/MAX_HISTORY-1);
+    }
+  }
+
+  // Beat pulse line
+  if(playing){
+    const beatProg=(now-lastBeat)/beatInterval;
+    X.globalAlpha=.04*(1-beatProg);X.fillStyle='#ffcc44';
+    X.fillRect(0,curY-1,W,2);
+  }
+
+  // Note labels on right side
+  X.globalAlpha=.06;X.font='7px monospace';X.textAlign='right';X.fillStyle='#fff';
+  const noteNames=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  for(let i=0;i<numCells;i++){
+    const freq=cellToFreq(i);
+    const midi=Math.round(12*Math.log2(freq/440)+69);
+    const name=noteNames[midi%12]+(Math.floor(midi/12)-1);
+    X.fillText(name,W-4,curY-(i-numCells)*(H/MAX_HISTORY/numCells*3));
+  }
+
+  X.globalAlpha=1;
+  const alive=Array.from(grid).filter(c=>c).length;
+  document.getElementById('stats').textContent=
+    'rule: '+rule+' ('+RULE_NAMES[ruleIdx]+')\ngen: '+generation+'\nalive: '+alive+'/'+numCells+
+    '\nscale: '+currentScale+'\nbpm: '+bpm;
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="cellular-music.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
