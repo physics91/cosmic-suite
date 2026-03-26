@@ -1,8 +1,8 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-16200+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-57_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-230-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-16275-black?style=flat-square) ![Files](https://img.shields.io/badge/files-58_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-233-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**57 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
+**58 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
 
 > *From nothing, everything.*
 
@@ -103,10 +103,10 @@ index.html           — Digital Cosmos (4679 lines, the flagship)
 
 ## Stats
 
-- **16,200+ lines** of hand-written code
-- **57 HTML files**, each fully self-contained
-- **230 git commits** in ~36 hours
-- **97 iterations** guided by dice rolls
+- **16,275 lines** of hand-written code
+- **58 HTML files**, each fully self-contained
+- **233 git commits** in ~36 hours
+- **100 iterations** guided by dice rolls
 - **0 external dependencies**
 - **60 FPS** across all experiences
 - **50 unique experiences** across 4 categories
@@ -139,6 +139,7 @@ Each iteration ended with "the universe learned..." — here are some favorites:
 - *Wait long enough and chaos builds a highway — patience is emergence*
 - *Even a 404 error can be an adventure*
 - *Your name was always written in four letters — A, T, G, C*
+- *After everything, nothing. After nothing, everything.*
 
 ## License
 
