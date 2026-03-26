@@ -80,6 +80,9 @@ function anim(){requestAnimationFrame(anim);
   X.fillStyle='rgba(5,5,8,.15)';X.fillRect(0,0,W,H);
   const obj=getCurrentObject();const cx=W/2,cy=H/2;
   const proximity=1-Math.min(1,Math.abs(currentPower-obj[0])/3);
+  // Direction indicator
+  if(Math.abs(targetPower-currentPower)>.5){X.globalAlpha=.06;X.fillStyle='#fff';X.font='14px sans-serif';X.textAlign='center';
+    X.fillText(targetPower>currentPower?'▼':'▲',cx,targetPower>currentPower?H-40:40);}
 
   // Visual based on type
   const r=40+proximity*60;const col=obj[4];
