@@ -186,10 +186,12 @@ function anim(){requestAnimationFrame(anim);
     if(now-lastBeat>beatInterval){lastBeat=now;const prev=playPos;playPos=reverse?(playPos+15)%16:(playPos+1)%16;if(!reverse&&playPos===0&&prev===15){loops++;if(pingpong)reverse=true;}
       if(reverse&&playPos===15&&prev===0){loops++;if(pingpong)reverse=false;}
       // Trigger stars in this column
-      for(const s of stars){const info=s.getNoteInfo();if(info.col===playPos)s.play();}}
+      for(const s of stars){const info=s.getNoteInfo();if(info.col===playPos){s.play();s.ripple=30;}}}
     const ph=$('playhead');ph.style.left=(playPos/16*100)+'%';}
   // Stars
-  for(const s of stars){s.update();s.draw(X);}
+  for(const s of stars){s.update();s.draw(X);
+    if(s.ripple>0){X.globalAlpha=(s.ripple/30)*.1;X.strokeStyle='#fff';X.lineWidth=.5;
+      X.beginPath();X.arc(s.x,s.y,(30-s.ripple)*2,0,Math.PI*2);X.stroke();s.ripple--;}}
   // Column density dots
   for(let col=0;col<16;col++){let count=0;for(const s of stars){if(s.getNoteInfo().col===col)count++;}
     if(count)for(let d=0;d<Math.min(count,5);d++){X.globalAlpha=.08;X.fillStyle='#ffcc44';X.beginPath();X.arc(col*W/16+W/32,H-8-d*4,1.5,0,Math.PI*2);X.fill();}}
