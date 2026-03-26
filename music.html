@@ -69,7 +69,7 @@ const SCALES={
   blues:[0,3,5,6,7,10]};
 
 // Stars
-let stars=[],playing=false,playPos=0,bpm=80,lastBeat=0,octave=0,reverse=false;
+let stars=[],playing=false,playPos=0,bpm=80,lastBeat=0,octave=0,reverse=false,loops=0;
 
 class MusicStar{
   constructor(x,y){this.x=x;this.y=y;this.sz=3+Math.random()*3;this.hue=Math.random()*360;
@@ -181,7 +181,7 @@ function anim(){requestAnimationFrame(anim);
   drawGrid(X);
   // Playhead
   if(playing){const now=performance.now();const beatInterval=60000/bpm/4;// 16th notes
-    if(now-lastBeat>beatInterval){lastBeat=now;playPos=reverse?(playPos+15)%16:(playPos+1)%16;
+    if(now-lastBeat>beatInterval){lastBeat=now;const prev=playPos;playPos=reverse?(playPos+15)%16:(playPos+1)%16;if(!reverse&&playPos===0&&prev===15)loops++;if(reverse&&playPos===15&&prev===0)loops++;
       // Trigger stars in this column
       for(const s of stars){const info=s.getNoteInfo();if(info.col===playPos)s.play();}}
     const ph=$('playhead');ph.style.left=(playPos/16*100)+'%';}
@@ -201,7 +201,7 @@ function anim(){requestAnimationFrame(anim);
   // Show last played note
   const noteNames=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   let lastNote='';for(const s of stars){if(s.glow>.5){const i=s.getNoteInfo();lastNote=noteNames[i.note%12]+Math.floor(i.note/12-1);}}
-  $('info').textContent=stars.length?stars.length+' STARS · '+$('scaleSelect').value.toUpperCase():'CLICK TO PLACE STARS · THEY BECOME NOTES'+(lastNote?' · ♪ '+lastNote:'');}
+  $('info').textContent=stars.length?stars.length+' STARS · '+$('scaleSelect').value.toUpperCase():'CLICK TO PLACE STARS · THEY BECOME NOTES'+(lastNote?' · ♪ '+lastNote:'')+(loops?' · loop '+loops:'');}
 anim();
 addEventListener("keydown",e=>{if(e.key==="f"&&!e.target.closest("input"))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
