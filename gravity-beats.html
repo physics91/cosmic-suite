@@ -26,7 +26,7 @@
 <div id="combo"></div>
 <div id="judge"></div>
 <div id="start" onclick="startGame()"><h1>GRAVITY BEATS</h1><p>notes fall through warped spacetime<br>DFJK to hit &middot; SPACE to place gravity well<br>click to start</p></div>
-<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="#" onclick="const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chat.html','clock.html','conway.html','dice.html','entropy.html','fourier.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','pendulum.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
 <script>
 const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
