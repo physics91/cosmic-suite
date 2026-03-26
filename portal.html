@@ -139,7 +139,17 @@ C.addEventListener('mousemove',e=>{mTrail.push({x:e.clientX,y:e.clientY});if(mTr
   for(let i=0;i<EXP.length;i++){const{x:px,y:py}=getPlanetPos(i);
     const dx=e.clientX-px,dy=e.clientY-py;if(dx*dx+dy*dy<bd){bd=dx*dx+dy*dy;best=i;}}
   if(best!==hovered){
-    if(best>=0&&best!==hovered&&!muted){try{const a=new(AudioContext||webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=300+best*50;o.type='sine';g.gain.setValueAtTime(.02,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.3);o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.3);}catch(e){}}
+    if(best>=0&&!muted){
+      if(!portalAC)initPortalAudio();
+      // Fade in hovered planet's tone
+      if(portalAC&&planetOscs[best]){
+        planetOscs[best].gain.gain.setTargetAtTime(.03,portalAC.currentTime,.05);
+      }
+    }
+    // Fade out previous
+    if(hovered>=0&&portalAC&&planetOscs[hovered]){
+      planetOscs[hovered].gain.gain.setTargetAtTime(0,portalAC.currentTime,.3);
+    }
     hovered=best;
     if(best>=0){document.getElementById('lName').textContent=EXP[best].name;
       document.getElementById('lDesc').textContent=EXP[best].desc;
@@ -153,6 +163,7 @@ C.addEventListener('click',e=>{
   let best=-1,bd=2500;
   for(let i=0;i<EXP.length;i++){const{x:px,y:py}=getPlanetPos(i);
     const dx=e.clientX-px,dy=e.clientY-py;if(dx*dx+dy*dy<bd){bd=dx*dx+dy*dy;best=i;}}
+  if(!portalAC)initPortalAudio();
   if(best>=0){markVisit(EXP[best].href);location.href=EXP[best].href+'?seed='+cosmicSeed;}});
 
 // Visit counter + time tracking
@@ -162,8 +173,43 @@ const visits=+(localStorage.getItem('suite_visits')||0)+1;localStorage.setItem('
 document.getElementById('hint').textContent='VISIT #'+visits+(totalMin?' · '+totalMin+' min total':'');
 
 let muted=false;
+
+// === MUSICA UNIVERSALIS — each planet has a frequency ===
+let portalAC=null,portalMaster=null,portalDrone=null,portalDroneGain=null;
+const planetOscs={};
+const SCALE_FREQS=[130.81,146.83,164.81,174.61,196,220,246.94,261.63,293.66,329.63,349.23,392,440,493.88,523.25,587.33,659.25,698.46,783.99,880,987.77,1046.5,1174.66,1318.51,1396.91,1567.98,1760,1975.53];
+function initPortalAudio(){
+  if(portalAC)return;
+  portalAC=new(AudioContext||webkitAudioContext)();
+  portalMaster=portalAC.createGain();portalMaster.gain.value=.12;
+  // Reverb
+  const cv=portalAC.createConvolver(),r=portalAC.sampleRate,l=r*3,buf=portalAC.createBuffer(2,l,r);
+  for(let c=0;c<2;c++){const d=buf.getChannelData(c);for(let i=0;i<l;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/l,3);}
+  cv.buffer=buf;const rvG=portalAC.createGain();rvG.gain.value=.4;
+  portalMaster.connect(portalAC.destination);
+  portalMaster.connect(cv);cv.connect(rvG);rvG.connect(portalAC.destination);
+  // Base drone — low octave hum
+  portalDrone=portalAC.createOscillator();portalDroneGain=portalAC.createGain();
+  portalDrone.type='sine';portalDrone.frequency.value=65.41; // C2
+  portalDroneGain.gain.value=.02;
+  portalDrone.connect(portalDroneGain);portalDroneGain.connect(portalMaster);
+  portalDrone.start();
+  // Create persistent oscillator per planet
+  for(let i=0;i<EXP.length;i++){
+    const osc=portalAC.createOscillator();
+    const gain=portalAC.createGain();
+    osc.type=i%3===0?'sine':i%3===1?'triangle':'sine';
+    osc.frequency.value=SCALE_FREQS[i%SCALE_FREQS.length];
+    gain.gain.value=0;
+    osc.connect(gain);gain.connect(portalMaster);
+    osc.start();
+    planetOscs[i]={osc,gain};
+  }
+}
+
 addEventListener('keydown',e=>{const n=+e.key;if(n>=1&&n<=9)location.href=EXP[n-1].href+'?seed='+cosmicSeed;
-  if(e.key==='m')muted=!muted;if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='m'){muted=!muted;if(portalMaster)portalMaster.gain.setTargetAtTime(muted?0:.12,portalAC.currentTime,.1);}
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
   if(e.key==='g')viewMode=viewMode==='orbit'?'galaxy':'orbit';});
 function anim(){requestAnimationFrame(anim);t+=.01;
   X.fillStyle='rgba(5,5,8,.12)';X.fillRect(0,0,W,H);
@@ -232,6 +278,17 @@ function anim(){requestAnimationFrame(anim);t+=.01;
     if(isHov){for(let s=0;s<3;s++){const sa=Math.random()*Math.PI*2;const sd=sz+Math.random()*20;
       X.globalAlpha=Math.random()*.2;X.fillStyle=exp.color;X.beginPath();
       X.arc(px+Math.cos(sa)*sd,py+Math.sin(sa)*sd,1,0,Math.PI*2);X.fill();}}
+    // Proximity audio — planets sing when mouse is near
+    if(portalAC&&planetOscs[i]&&!muted&&mTrail.length>0){
+      const mx=mTrail[mTrail.length-1].x,my=mTrail[mTrail.length-1].y;
+      const md=Math.sqrt((px-mx)**2+(py-my)**2);
+      if(md<150&&i!==hovered){
+        const vol=.008*(1-md/150);
+        planetOscs[i].gain.gain.setTargetAtTime(vol,portalAC.currentTime,.1);
+      }else if(i!==hovered){
+        planetOscs[i].gain.gain.setTargetAtTime(0,portalAC.currentTime,.2);
+      }
+    }
     // Label — always show (dimmer when not hovered)
     X.globalAlpha=isHov?.5:.12;X.font=(isHov?'10':'7')+'px sans-serif';X.fillStyle='#fff';
     X.fillText(exp.name,px,py+sz+12);}
