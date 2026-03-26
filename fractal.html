@@ -47,7 +47,12 @@ const PALETTES=[
 let colorIdx=0;
 function cycleColor(){colorIdx=(colorIdx+1)%PALETTES.length;document.getElementById('colName').textContent=PALETTES[colorIdx].name;needsRender=true;}
 
-function resetView(){centerX=juliaMode?0:-.5;centerY=0;zoom=3;needsRender=true;}
+// Zoom history for rewind
+let zoomHistory=[];
+function saveState(){zoomHistory.push({cx:centerX,cy:centerY,z:zoom});if(zoomHistory.length>200)zoomHistory.shift();}
+function rewind(){if(zoomHistory.length>1){zoomHistory.pop();const s=zoomHistory[zoomHistory.length-1];centerX=s.cx;centerY=s.cy;zoom=s.z;needsRender=true;}}
+
+function resetView(){centerX=juliaMode?0:-.5;centerY=0;zoom=3;zoomHistory=[];needsRender=true;}
 function toggleJulia(){juliaMode=!juliaMode;document.getElementById('jLabel').textContent=juliaMode?'Julia':'Mandelbrot';resetView();}
 
 // === INPUT ===
@@ -55,11 +60,12 @@ C.addEventListener('click',e=>{
   if(e.target.closest('.btn,a'))return;
   const mx=(e.clientX/W-.5)*zoom+centerX;
   const my=(e.clientY/H-.5)*zoom*H/W+centerY;
+  saveState();
   centerX=mx;centerY=my;zoom*=.5;
-  if(juliaMode){juliaX=mx;juliaY=my;} // In Julia mode, click sets c
+  if(juliaMode){juliaX=mx;juliaY=my;}
   needsRender=true;
 });
-C.addEventListener('contextmenu',e=>{e.preventDefault();zoom*=2;needsRender=true;});
+C.addEventListener('contextmenu',e=>{e.preventDefault();rewind();});
 addEventListener('wheel',e=>{
   e.preventDefault();
   const factor=e.deltaY>0?1.3:.77;
@@ -72,6 +78,7 @@ addEventListener('wheel',e=>{
 },{passive:false});
 addEventListener('keydown',e=>{
   if(e.key==='j')toggleJulia();
+  if(e.key==='z')rewind();
   if(e.key==='r')resetView();
   if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
   if(e.key==='+'){maxIter+=50;needsRender=true;}
@@ -132,7 +139,8 @@ function renderFractal(){
   document.getElementById('coords').textContent=
     'center: '+centerX.toFixed(12)+' + '+centerY.toFixed(12)+'i\n'+
     'zoom: '+zoomLevel.toExponential(2)+'x\niter: '+maxIter+
-    (juliaMode?'\njulia c: '+juliaX.toFixed(4)+' + '+juliaY.toFixed(4)+'i':'');
+    (juliaMode?'\njulia c: '+juliaX.toFixed(4)+' + '+juliaY.toFixed(4)+'i':'')+
+    '\nhistory: '+zoomHistory.length+' (Z/right-click=rewind)';
 }
 
 function anim(){
