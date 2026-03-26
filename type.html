@@ -28,7 +28,7 @@ const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
-let stars=[],totalKeys=0,totalWords=0;
+let stars=[],totalKeys=0,totalWords=0,startTime=0;
 const hueBase=Math.random()*360;
 
 // Audio
@@ -77,6 +77,7 @@ let lastLength=0;
 input.addEventListener('input',()=>{
   const val=input.value;
   if(val.length>lastLength){// New character typed
+    if(!startTime)startTime=performance.now();
     const char=val[val.length-1];
     if(char===' '){// Word complete
       const words=val.trim().split(/\s+/);
@@ -124,7 +125,8 @@ function anim(){requestAnimationFrame(anim);
     const dx=a.x-b.x,dy=a.y-b.y;if(dx*dx+dy*dy>10000)continue;
     X.globalAlpha=.03;X.beginPath();X.moveTo(a.x,a.y);X.lineTo(b.x,b.y);X.stroke();}
   X.globalAlpha=1;
-  document.getElementById('stats').textContent=totalKeys+' keys · '+totalWords+' words · '+stars.length+' stars';}
+  const wpm=startTime&&totalWords?Math.round(totalWords/((performance.now()-startTime)/60000)):0;
+  document.getElementById('stats').textContent=totalKeys+' keys · '+totalWords+' words · '+stars.length+' stars'+(wpm?' · '+wpm+' wpm':'');}
 anim();
 input.focus();
 </script>
