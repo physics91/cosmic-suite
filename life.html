@@ -46,7 +46,7 @@ let rules=Array.from({length:N},()=>Array.from({length:N},()=>+((Math.random()-.
 
 let particles=[];const COUNT=400;
 function createParticles(){particles=[];
-  for(let i=0;i<COUNT;i++)particles.push({x:Math.random()*W,y:Math.random()*H,vx:0,vy:0,sp:i%N});}
+  for(let i=0;i<COUNT;i++)particles.push({x:Math.random()*W,y:Math.random()*H,z:(Math.random()-.5)*300,vx:0,vy:0,vz:0,sp:i%N});}
 createParticles();
 
 function preset(name){
@@ -75,9 +75,9 @@ function renderMatrix(){
   el.appendChild(tbl);}
 renderMatrix();
 
-let _paused=false;
+let _paused=false,view3d=false,rotY=0;
 addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();_paused=!_paused;}
-  if(e.key==='r')randomize();if(e.key==='c')reset();});
+  if(e.key==='r')randomize();if(e.key==='c')reset();if(e.key==='v'){view3d=!view3d;for(const p of particles)p.z=p.z||(Math.random()-.5)*300;}});
 C.addEventListener('contextmenu',e=>{e.preventDefault();
   for(let i=particles.length-1;i>=0;i--){const dx=particles[i].x-e.clientX,dy=particles[i].y-e.clientY;
     if(dx*dx+dy*dy<400){particles.splice(i,1);break;}}});
@@ -103,9 +103,15 @@ function toggleShuffle(){_shuf=!_shuf;document.getElementById('shBtn').textConte
 function anim(){requestAnimationFrame(anim);_fc++;if(_shuf){_shufT++;if(_shufT>300){_shufT=0;randomize();}}_ft+=16;if(_ft>=1000){_fps=_fc;_fc=0;_ft=0;}
   const spd=+(document.getElementById('spd')?.value||1);document.getElementById('spdV').textContent=spd+'x';
   X.fillStyle='rgba(8,8,16,.15)';X.fillRect(0,0,W,H);if(!_paused)for(let i=0;i<spd;i++)update();
+  rotY+=view3d?.005:0;
   for(const p of particles){const s=SPECIES[p.sp];const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
-    X.globalAlpha=.04+spd*.02;X.fillStyle=s.color;X.beginPath();X.arc(p.x,p.y,4+spd*2,0,Math.PI*2);X.fill();
-    X.globalAlpha=.6+spd*.2;X.beginPath();X.arc(p.x,p.y,1.5,0,Math.PI*2);X.fill();}
+    let sx=p.x,sy=p.y,sc=1;
+    if(view3d){// 3D projection with rotation
+      const cx=p.x-W/2,cz=p.z||0;
+      const rx=cx*Math.cos(rotY)-cz*Math.sin(rotY);const rz=cx*Math.sin(rotY)+cz*Math.cos(rotY);
+      const perspective=600/(600+rz);sx=W/2+rx*perspective;sy=p.y*perspective+H/2*(1-perspective);sc=perspective;}
+    X.globalAlpha=(.04+spd*.02)*sc;X.fillStyle=s.color;X.beginPath();X.arc(sx,sy,(4+spd*2)*sc,0,Math.PI*2);X.fill();
+    X.globalAlpha=(.6+spd*.2)*sc;X.beginPath();X.arc(sx,sy,1.5*sc,0,Math.PI*2);X.fill();}
   // Same-species bonds
   if(!_paused)for(let i=0;i<particles.length;i+=4){const a=particles[i];
     for(let j=i+4;j<particles.length;j+=4){const b=particles[j];if(a.sp!==b.sp)continue;
@@ -113,7 +119,7 @@ function anim(){requestAnimationFrame(anim);_fc++;if(_shuf){_shufT++;if(_shufT>3
         X.beginPath();X.moveTo(a.x,a.y);X.lineTo(b.x,b.y);X.stroke();}}}
   X.globalAlpha=1;
   const pop=[0,0,0,0];for(const p of particles)pop[p.sp]++;
-  document.getElementById('info').textContent='R:'+pop[0]+' G:'+pop[1]+' B:'+pop[2]+' Y:'+pop[3]+' · '+_fps+' FPS';}
+  document.getElementById('info').textContent='R:'+pop[0]+' G:'+pop[1]+' B:'+pop[2]+' Y:'+pop[3]+' · '+_fps+' FPS'+(view3d?' · 3D':'');}
 anim();
 addEventListener("keydown",e=>{if(e.key==="f"&&!e.target.closest("input"))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
