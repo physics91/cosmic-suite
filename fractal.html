@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fractal</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23000'/><circle cx='14' cy='16' r='6' fill='none' stroke='%23ff8844' stroke-width='.5' opacity='.4'/></svg>">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
+    canvas{display:block}
+    #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
+    #coords{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
+    .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">CLICK TO ZOOM IN &middot; RIGHT-CLICK TO ZOOM OUT &middot; J = JULIA MODE</div>
+<div id="coords"></div>
+<button class="btn" style="bottom:16px;right:16px" onclick="resetView()">Reset</button>
+<button class="btn" style="bottom:16px;right:75px" onclick="cycleColor()">Color: <span id="colName">Fire</span></button>
+<button class="btn" style="bottom:16px;right:175px" onclick="toggleJulia()"><span id="jLabel">Mandelbrot</span></button>
+<button class="btn" style="bottom:16px;right:285px" onclick="maxIter=maxIter>=500?100:maxIter+100;needsRender=true;this.textContent='Iter '+maxIter">Iter 200</button>
+<a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="#" onclick="const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chat.html','clock.html','conway.html','dice.html','entropy.html','flocking.html','fourier.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','pendulum.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','swarm-gravity.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+
+// === FRACTAL STATE ===
+let centerX=-.5,centerY=0,zoom=3;
+let maxIter=200,juliaMode=false,juliaX=-.7,juliaY=.27015;
+let needsRender=true;
+
+function resize(){W=C.width=innerWidth;H=C.height=innerHeight;needsRender=true;}
+resize();addEventListener('resize',resize);
+
+const PALETTES=[
+  {name:'Fire',fn:(t)=>[Math.min(255,t*12),Math.min(255,t*4),Math.min(255,t*1)]},
+  {name:'Ocean',fn:(t)=>[Math.min(255,t*2),Math.min(255,t*6),Math.min(255,t*12)]},
+  {name:'Neon',fn:(t)=>[Math.min(255,Math.sin(t*.1)*128+127),Math.min(255,Math.sin(t*.13+2)*128+127),Math.min(255,Math.sin(t*.17+4)*128+127)]},
+  {name:'Mono',fn:(t)=>{const v=Math.min(255,t*5);return[v,v,v];}},
+  {name:'Psychedelic',fn:(t)=>[Math.min(255,Math.sin(t*.03)*128+127),Math.min(255,Math.cos(t*.05)*128+127),Math.min(255,Math.sin(t*.07+1)*128+127)]},
+  {name:'Ice',fn:(t)=>[Math.min(255,t*1),Math.min(255,t*3),Math.min(255,50+t*8)]},
+];
+let colorIdx=0;
+function cycleColor(){colorIdx=(colorIdx+1)%PALETTES.length;document.getElementById('colName').textContent=PALETTES[colorIdx].name;needsRender=true;}
+
+function resetView(){centerX=juliaMode?0:-.5;centerY=0;zoom=3;needsRender=true;}
+function toggleJulia(){juliaMode=!juliaMode;document.getElementById('jLabel').textContent=juliaMode?'Julia':'Mandelbrot';resetView();}
+
+// === INPUT ===
+C.addEventListener('click',e=>{
+  if(e.target.closest('.btn,a'))return;
+  const mx=(e.clientX/W-.5)*zoom+centerX;
+  const my=(e.clientY/H-.5)*zoom*H/W+centerY;
+  centerX=mx;centerY=my;zoom*=.5;
+  if(juliaMode){juliaX=mx;juliaY=my;} // In Julia mode, click sets c
+  needsRender=true;
+});
+C.addEventListener('contextmenu',e=>{e.preventDefault();zoom*=2;needsRender=true;});
+addEventListener('wheel',e=>{
+  e.preventDefault();
+  const factor=e.deltaY>0?1.3:.77;
+  const mx=(e.clientX/W-.5)*zoom+centerX;
+  const my=(e.clientY/H-.5)*zoom*H/W+centerY;
+  zoom*=factor;
+  centerX+=(mx-centerX)*(1-factor);
+  centerY+=(my-centerY)*(1-factor);
+  needsRender=true;
+},{passive:false});
+addEventListener('keydown',e=>{
+  if(e.key==='j')toggleJulia();
+  if(e.key==='r')resetView();
+  if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
+  if(e.key==='+'){maxIter+=50;needsRender=true;}
+  if(e.key==='-'){maxIter=Math.max(50,maxIter-50);needsRender=true;}
+});
+
+// === RENDER ===
+let imgData=null;
+const offC=document.createElement('canvas');
+const offX=offC.getContext('2d');
+
+function renderFractal(){
+  // Use lower res for speed, scale up
+  const scale=2; // render at half res
+  const rw=Math.ceil(W/scale),rh=Math.ceil(H/scale);
+  offC.width=rw;offC.height=rh;
+  if(!imgData||imgData.width!==rw)imgData=new ImageData(rw,rh);
+  const d=imgData.data;
+  const palette=PALETTES[colorIdx].fn;
+  const aspect=H/W;
+
+  for(let py=0;py<rh;py++){
+    for(let px=0;px<rw;px++){
+      const x0=((px/rw)-.5)*zoom+centerX;
+      const y0=((py/rh)-.5)*zoom*aspect+centerY;
+
+      let x,y,cx,cy;
+      if(juliaMode){
+        x=x0;y=y0;cx=juliaX;cy=juliaY;
+      }else{
+        x=0;y=0;cx=x0;cy=y0;
+      }
+
+      let iter=0;
+      while(x*x+y*y<=4&&iter<maxIter){
+        const xn=x*x-y*y+cx;
+        y=2*x*y+cy;x=xn;iter++;
+      }
+
+      const pi=(py*rw+px)*4;
+      if(iter===maxIter){
+        d[pi]=0;d[pi+1]=0;d[pi+2]=0;
+      }else{
+        // Smooth coloring
+        const smooth=iter+1-Math.log2(Math.log2(x*x+y*y));
+        const [r,g,b]=palette(smooth);
+        d[pi]=r;d[pi+1]=g;d[pi+2]=b;
+      }
+      d[pi+3]=255;
+    }
+  }
+
+  offX.putImageData(imgData,0,0);
+  X.imageSmoothingEnabled=true;
+  X.drawImage(offC,0,0,rw,rh,0,0,W,H);
+
+  const zoomLevel=3/zoom;
+  document.getElementById('coords').textContent=
+    'center: '+centerX.toFixed(12)+' + '+centerY.toFixed(12)+'i\n'+
+    'zoom: '+zoomLevel.toExponential(2)+'x\niter: '+maxIter+
+    (juliaMode?'\njulia c: '+juliaX.toFixed(4)+' + '+juliaY.toFixed(4)+'i':'');
+}
+
+function anim(){
+  requestAnimationFrame(anim);
+  if(needsRender){needsRender=false;renderFractal();}
+}
+anim();
+</script>
+<script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="fractal.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
+</body>
+</html>
