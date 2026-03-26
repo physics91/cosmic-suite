@@ -68,6 +68,9 @@ function hitLane(lane){
   if(hitNote){hitNote.hit=true;combo++;if(combo>maxCombo)maxCombo=combo;
     const perfect=bestDist<15;score+=perfect?100*combo:50*combo;
     hits.push({x:LANES[lane].x*W,y:HIT_ZONE,t:20,perfect});
+    // Spawn nebula on hit
+    if(nebulae.length<40)nebulae.push({x:LANES[lane].x*W+(Math.random()-.5)*60,y:HIT_ZONE+(Math.random()-.5)*40,
+      r:20+combo*2+Math.random()*30,hue:lane*90,life:1});
     playNote(lane,1);
   }else{combo=0;misses++;playNote(lane,.3);if(misses>10)endGame();}}
 
@@ -85,13 +88,27 @@ for(let i=0;i<4;i++){
   document.body.appendChild(zone);}
 
 const bg=Array.from({length:60},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random(),p:Math.random()*Math.PI*2}));
+const nebulae=[]; // persistent hit nebulae
 
 function anim(){requestAnimationFrame(anim);
-  X.fillStyle='rgba(6,6,16,.2)';X.fillRect(0,0,W,H);
+  // Background brightness follows combo
+  const comboGlow=Math.min(1,combo/30);
+  const bgR=6+comboGlow*8,bgG=6+comboGlow*4,bgB=16+comboGlow*10;
+  X.fillStyle='rgba('+bgR+','+bgG+','+bgB+',.15)';X.fillRect(0,0,W,H);
 
-  // BG
-  for(const s of bg){s.p+=.003;X.globalAlpha=.03+Math.sin(s.p)*.02;X.fillStyle='#fff';
-    X.beginPath();X.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);X.fill();}
+  // BG stars — brighter with combo
+  for(const s of bg){s.p+=.003;X.globalAlpha=(.03+Math.sin(s.p)*.02)*(1+comboGlow*.5);X.fillStyle='#fff';
+    X.beginPath();X.arc(s.x%W,s.y%H,s.s*(1+comboGlow*.3),0,Math.PI*2);X.fill();}
+
+  // Nebulae — persistent hit clouds
+  for(let i=nebulae.length-1;i>=0;i--){
+    const n=nebulae[i];n.life-=.002;
+    if(n.life<=0){nebulae.splice(i,1);continue;}
+    X.globalAlpha=n.life*.04;
+    const g=X.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r);
+    g.addColorStop(0,'hsla('+n.hue+',50%,40%,.2)');g.addColorStop(1,'hsla('+n.hue+',50%,20%,0)');
+    X.fillStyle=g;X.beginPath();X.arc(n.x,n.y,n.r,0,Math.PI*2);X.fill();
+  }
 
   if(state==='play'){
     speed=Math.min(8,3+score*.001);
