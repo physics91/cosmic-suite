@@ -174,6 +174,11 @@ function anim(){requestAnimationFrame(anim);
     const ph=$('playhead');ph.style.left=(playPos/16*100)+'%';}
   // Stars
   for(const s of stars){s.update();s.draw(X);}
+  // Scale guide — highlight root note rows
+  const curScale=SCALES[$('scaleSelect').value]||SCALES.minor;
+  for(let i=0;i<24;i++){if(curScale.includes(i%12)){const ny=H-i*H/24;
+    X.globalAlpha=i%12===0?.03:.01;X.fillStyle='#ffcc44';X.fillRect(0,ny-H/48,W,H/24);}}
+  X.globalAlpha=1;
   // Star count
   $('info').textContent=stars.length?stars.length+' STARS · '+$('scaleSelect').value.toUpperCase():'CLICK TO PLACE STARS · THEY BECOME NOTES';}
 anim();
