@@ -29,7 +29,7 @@ let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
 let stars=[],totalKeys=0,totalWords=0,startTime=0;
-const hueBase=Math.random()*360;
+let hueBase=Math.random()*360;
 
 // Audio
 let aC=null,gain=null;
@@ -87,6 +87,7 @@ input.addEventListener('input',()=>{
   lastLength=val.length;});
 
 input.addEventListener('keydown',e=>{
+  if(e.key==='Tab'){e.preventDefault();hueBase=(hueBase+60)%360;}
   if(e.key==='Enter'){// Submit line — burst all remaining characters
     const val=input.value.trim();
     if(val){const words=val.split(/\s+/);
