@@ -48,6 +48,7 @@
   <button class="btn" onclick="repel=!repel;this.textContent=repel?'Repel':'Attract'">Attract</button>
   <button class="btn" onclick="fieldMode=!fieldMode;fields=[];this.textContent=fieldMode?'Field ON':'Field OFF'">Field OFF</button>
   <button class="btn" onclick="exportArt()">Export PNG</button>
+  <button class="btn" id="fluidBtn" onclick="fluidMode=!fluidMode;this.classList.toggle('on')">Fluid</button>
 </div>
 <script>
 const artC=document.getElementById('art'),artX=artC.getContext('2d');
@@ -91,7 +92,44 @@ addEventListener('mousemove',e=>{if(painting&&fieldMode){
 function addWell(x,y){if(fieldMode)return;const m=+(document.getElementById('gStr').value);wells.push({x,y,mass:m});
   if(symm){wells.push({x:W-x,y,mass:m});wells.push({x,y:H-y,mass:m});wells.push({x:W-x,y:H-y,mass:m});}}
 addEventListener('click',e=>{if(e.target.closest('#controls,#palette,#settings'))return;addWell(e.clientX,e.clientY);});
-let symm=false,repel=false,fieldMode=false,fields=[];
+let symm=false,repel=false,fieldMode=false,fields=[],fluidMode=false;
+// Fluid velocity grid
+const FRES=20;
+let fluidCols,fluidRows,fluidVX,fluidVY;
+function initFluid(){
+  fluidCols=Math.ceil(W/FRES)+1;fluidRows=Math.ceil(H/FRES)+1;
+  fluidVX=new Float32Array(fluidCols*fluidRows);
+  fluidVY=new Float32Array(fluidCols*fluidRows);
+}
+initFluid();
+let fluidMX=0,fluidMY=0,fluidPMX=0,fluidPMY=0,fluidDown=false;
+addEventListener('mousedown',e=>{if(fluidMode){fluidDown=true;fluidMX=fluidPMX=e.clientX;fluidMY=fluidPMY=e.clientY;}});
+addEventListener('mousemove',e=>{if(fluidMode&&fluidDown){
+  fluidPMX=fluidMX;fluidPMY=fluidMY;fluidMX=e.clientX;fluidMY=e.clientY;
+  // Inject velocity into grid
+  const gx=Math.floor(fluidMX/FRES),gy=Math.floor(fluidMY/FRES);
+  const dvx=(fluidMX-fluidPMX)*.5,dvy=(fluidMY-fluidPMY)*.5;
+  for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+    const cx=gx+dx,cy=gy+dy;
+    if(cx>=0&&cx<fluidCols&&cy>=0&&cy<fluidRows){
+      const i=cy*fluidCols+cx;const d=Math.sqrt(dx*dx+dy*dy)+1;
+      fluidVX[i]+=dvx/d;fluidVY[i]+=dvy/d;
+    }
+  }
+}});
+addEventListener('mouseup',()=>{fluidDown=false;});
+function stepFluid(){
+  // Diffuse + decay
+  const nvx=new Float32Array(fluidCols*fluidRows);
+  const nvy=new Float32Array(fluidCols*fluidRows);
+  for(let y=1;y<fluidRows-1;y++)for(let x=1;x<fluidCols-1;x++){
+    const i=y*fluidCols+x;
+    // Average neighbors (diffusion)
+    nvx[i]=(fluidVX[i]*.6+(fluidVX[i-1]+fluidVX[i+1]+fluidVX[i-fluidCols]+fluidVX[i+fluidCols])*.1)*.995;
+    nvy[i]=(fluidVY[i]*.6+(fluidVY[i-1]+fluidVY[i+1]+fluidVY[i-fluidCols]+fluidVY[i+fluidCols])*.1)*.995;
+  }
+  fluidVX=nvx;fluidVY=nvy;
+}
 addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];addWell(t.clientX,t.clientY);});
 addEventListener('contextmenu',e=>{e.preventDefault();
   // Remove nearest well
@@ -133,6 +171,7 @@ addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();artPaused=!art
 let _af=0,_at=0,_afps=0;
 function anim(){requestAnimationFrame(anim);
   if(artPaused){_af++;_at+=16;if(_at>=1000){_afps=_af;_af=0;_at=0;}return;}
+  if(fluidMode)stepFluid();
   const trail=+(document.getElementById('tLen').value);
   const colors=PALETTES[currentPalette].colors;
   // Fade art canvas slightly (creates trails)
@@ -147,6 +186,15 @@ function anim(){requestAnimationFrame(anim);
     // Force fields
     for(const f of fields){const fdx=f.x-p.x,fdy=f.y-p.y,fd=fdx*fdx+fdy*fdy;
       if(fd<2500){const str=1-Math.sqrt(fd)/50;p.vx+=f.fx*str*.05;p.vy+=f.fy*str*.05;}}
+    // Fluid mode — sample velocity grid
+    if(fluidMode){
+      const gx=Math.floor(p.x/FRES),gy=Math.floor(p.y/FRES);
+      if(gx>=0&&gx<fluidCols&&gy>=0&&gy<fluidRows){
+        const gi=gy*fluidCols+gx;
+        p.vx+=fluidVX[gi]*.3;p.vy+=fluidVY[gi]*.3;
+      }
+      p.vx*=.98;p.vy*=.98; // more damping in fluid mode
+    }
     // Speed limit
     const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
     if(spd>8){p.vx=(p.vx/spd)*8;p.vy=(p.vy/spd)*8;}
