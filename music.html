@@ -190,7 +190,10 @@ function anim(){requestAnimationFrame(anim);
     X.globalAlpha=i%12===0?.03:.01;X.fillStyle='#ffcc44';X.fillRect(0,ny-H/48,W,H/24);}}
   X.globalAlpha=1;
   // Star count
-  $('info').textContent=stars.length?stars.length+' STARS · '+$('scaleSelect').value.toUpperCase():'CLICK TO PLACE STARS · THEY BECOME NOTES';}
+  // Show last played note
+  const noteNames=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  let lastNote='';for(const s of stars){if(s.glow>.5){const i=s.getNoteInfo();lastNote=noteNames[i.note%12]+Math.floor(i.note/12-1);}}
+  $('info').textContent=stars.length?stars.length+' STARS · '+$('scaleSelect').value.toUpperCase():'CLICK TO PLACE STARS · THEY BECOME NOTES'+(lastNote?' · ♪ '+lastNote:'');}
 anim();
 </script>
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a>
