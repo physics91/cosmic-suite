@@ -2,7 +2,7 @@
 
 ![Lines](https://img.shields.io/badge/lines-7700+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-24_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-150+-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
-**22 cosmic experiences in pure HTML. No dependencies.**
+**23 cosmic experiences in pure HTML. No dependencies.**
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -32,6 +32,7 @@
 | ❋ | **Living Mandala** | Mandala × Life · breathing geometry | Create |
 | 🎲 | **Dice** | 12-face cosmic oracle · shake to roll | Feel |
 | 🌄 | **Sonic Terrain** | Terrain × Music · landscape becomes melody | Create |
+| 🕳 | **Gravity Well** | Bend spacetime · light lensing · accretion disks | Think |
 
 ## Quick Start
 
