@@ -175,7 +175,8 @@ function render(){requestAnimationFrame(render);
   const newBest=state==='play'&&score>bestScore&&bestScore>0;
   document.getElementById('score').textContent=score+(state==='play'?' · '+Math.floor(survivalTime)+'s':'')+(newBest?' NEW BEST!':'');
   const alt=state==='play'?Math.round(Math.sqrt((ship.x-stars[0].x)**2+(ship.y-stars[0].y)**2)):0;
-  document.getElementById('hint').textContent=state==='play'?'LEVEL '+level+(boosting?' · BOOST':'')+(alt?' · ALT '+alt:'')+(combo>1?' · x'+combo+' COMBO':''):'';}
+  const vel=state==='play'?Math.round(Math.sqrt(ship.vx*ship.vx+ship.vy*ship.vy)*100):0;
+  document.getElementById('hint').textContent=state==='play'?'LVL '+level+(vel?' · SPD '+vel:'')+(alt?' · ALT '+alt:'')+(combo>1?' · x'+combo:'')+(boosting?' · BOOST':''):'';}
 render();
 addEventListener("keydown",e=>{if(e.key==="f"&&!e.target.closest("input"))document.documentElement.requestFullscreen().catch(()=>{});});
 </script>
