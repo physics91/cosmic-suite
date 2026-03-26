@@ -105,6 +105,7 @@ function update(){
   for(const c of collectibles){if(c.collected)continue;
     const dx=c.x-ship.x,dy=c.y-ship.y;
     if(dx*dx+dy*dy<(c.sz+5)*(c.sz+5)){c.collected=true;c.glow=1;score++;
+      try{const a=new(AudioContext||webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=600+score*20;o.type='sine';g.gain.setValueAtTime(.03,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.2);o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.2);}catch(e){}
       // Burst particles
       for(let i=0;i<8;i++){const a=i*Math.PI/4;particles.push({x:c.x,y:c.y,vx:Math.cos(a)*3,vy:Math.sin(a)*3,life:20,color:'#ffcc44'});}
       // Level up
