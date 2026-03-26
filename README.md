@@ -35,9 +35,29 @@ Or serve:
 python3 -m http.server 8765
 ```
 
+## Keyboard Shortcuts (All Experiences)
+
+| Key | Music | Canvas | Breathe | Life | Clock | Orbit | Scale | Type |
+|-----|-------|--------|---------|------|-------|-------|-------|------|
+| Space | Play/Pause | Pause | Start/Stop | Pause | — | Boost | — | — |
+| F | Fullscreen | Fullscreen | Fullscreen | Fullscreen | Fullscreen | Fullscreen | Fullscreen | Fullscreen |
+| R | Random | Random wells | — | Randomize | — | — | Random jump | — |
+| C | Clear | Clear art | — | Reset | — | — | — | — |
+| S | Snap grid | Symmetry | — | — | — | — | — | — |
+| P | — | Palette | — | — | — | — | — | — |
+| I | — | Invert | — | — | — | — | — | — |
+| Z | Undo | — | — | — | — | — | — | — |
+| T | Tap BPM | — | — | — | — | — | — | — |
+| Tab | — | — | — | — | — | — | — | Color theme |
+| A | — | — | — | — | — | — | Auto-scroll | — |
+| 0 | — | — | — | — | — | — | Human scale | — |
+| ↑↓ | — | — | — | — | — | — | Navigate | — |
+| Click | Place star | Place well | Start | Spawn 20 | Dbl=tick | Start/Boost | — | — |
+| R-click | — | Remove well | — | Remove | — | — | — | — |
+
 ## Stats
 
-- **~5900 lines** of code total
+- **~6100 lines** of code total
 - **10 HTML files**, each self-contained
 - **0 external dependencies**
 - **0 build tools**
@@ -45,7 +65,7 @@ python3 -m http.server 8765
 - **60 FPS** across all experiences
 - **0 console errors** (verified via Playwright)
 - **84 achievements** (Digital Cosmos)
-- **20 git commits**
+- **130+ git commits**
 
 ## Digital Cosmos (the flagship)
 
