@@ -39,6 +39,7 @@ resize();addEventListener('resize',resize);
 
 // State
 let active=false,breathPhase=0,breathTimer=0,totalTime=0,soundOn=false,cycles=0;
+let lifetimeBreaths=+(localStorage.getItem('breathe_total')||0);
 let aC=null,oscL=null,oscR=null,gainNode=null;
 
 // Breathing patterns: [inhale, hold, exhale, hold] in seconds
@@ -104,7 +105,7 @@ function anim(){requestAnimationFrame(anim);
   if(active){
     breathTimer+=1/60;totalTime+=1/60;
     if(breathTimer>=phaseDur){breathTimer=0;const prev=breathPhase;breathPhase=(breathPhase+1)%4;
-      if(prev===2){cycles++;if(cycles===10)document.getElementById('phase').textContent='10 BREATHS · WELL DONE';
+      if(prev===2){cycles++;lifetimeBreaths++;localStorage.setItem('breathe_total',''+lifetimeBreaths);if(cycles===10)document.getElementById('phase').textContent='10 BREATHS · WELL DONE';
         if(cycles===25)document.getElementById('phase').textContent='25 · YOU ARE CALM';
         if(cycles===50)document.getElementById('phase').textContent='50 · MASTERY';
         const quotes=['Be here now','This moment is enough','Breathe and let be','You are the sky','Stillness speaks'];
@@ -114,7 +115,7 @@ function anim(){requestAnimationFrame(anim);
       document.getElementById('phase').textContent=PHASES[breathPhase];
       updateSound();}
     const min=totalTime/60|0;const sec=totalTime%60|0;
-    document.getElementById('timer').textContent=min+'m '+sec+'s · '+cycles+' breaths';}
+    document.getElementById('timer').textContent=min+'m '+sec+'s · '+cycles+' breaths · '+lifetimeBreaths+' lifetime';}
 
   // Breath progress 0→1
   const progress=breathTimer/phaseDur;
