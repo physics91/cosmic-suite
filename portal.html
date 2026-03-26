@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Cosmic Suite</title>
-  <meta name="description" content="9 cosmic experiences in pure HTML. Explore a universe, compose with stars, draw with gravity, breathe with mandalas. Zero dependencies.">
+  <meta name="description" content="23 cosmic experiences in pure HTML. Explore a universe, compose with stars, draw with gravity, breathe with mandalas. Zero dependencies.">
   <meta property="og:title" content="The Cosmic Suite">
   <meta property="og:description" content="9 cosmic experiences in pure HTML. No frameworks. No dependencies. Just imagination and JavaScript.">
   <meta property="og:type" content="website">
@@ -80,6 +80,39 @@ const EXP=[
 let hovered=-1,t=0,mTrail=[],viewMode='orbit',filterCat='all';// orbit or galaxy
 const bgStars=Array.from({length:200},()=>({x:Math.random()*3e3,y:Math.random()*3e3,s:Math.random()*1.5,p:Math.random()*Math.PI*2}));
 
+// === COSMIC MEMORY — reads traces from all experiences ===
+const cosmicMemory={
+  breathCycles:+(localStorage.getItem('breathe_cycles')||0),
+  orbitBest:+(localStorage.getItem('orbit_best')||0),
+  orbitGames:+(localStorage.getItem('orbit_games')||0),
+  cosmosStars:+(localStorage.getItem('cosmos_stars')||0),
+  typedChars:+(localStorage.getItem('type_chars')||0),
+  puzzleLevels:+(localStorage.getItem('puzzle_level')||0),
+  racerBest:+(localStorage.getItem('racer_best')||0),
+  memoryWins:+(localStorage.getItem('memory_wins')||0),
+  beatsBest:+(localStorage.getItem('beats_best')||0),
+  totalTime:+(localStorage.getItem('suite_time')||0),
+  visits:+(localStorage.getItem('suite_visits')||0),
+};
+// Universe age = total seconds across all tracked activity
+const universeAge=cosmicMemory.totalTime+cosmicMemory.breathCycles*60+cosmicMemory.orbitGames*30;
+// "Constellations" formed by visited experiences
+const visitedExps=[];
+for(let i=0;i<EXP.length;i++){
+  const key='visited_'+EXP[i].href.replace('.html','');
+  if(localStorage.getItem(key))visitedExps.push(i);
+}
+// Mark current visit
+function markVisit(href){localStorage.setItem('visited_'+href.replace('.html',''),'1');}
+// Cosmic epoch name based on total engagement
+function getEpoch(){
+  const a=universeAge;
+  if(a<60)return'THE VOID';if(a<300)return'THE SPARK';if(a<900)return'THE NEBULA';
+  if(a<1800)return'THE IGNITION';if(a<3600)return'THE CONSTELLATION';
+  if(a<7200)return'THE GALAXY';if(a<14400)return'THE SUPERCLUSTER';
+  return'THE OBSERVABLE UNIVERSE';
+}
+
 function getPlanetPos(i){const cx=W/2,cy=H/2,exp=EXP[i];
   if(viewMode==='galaxy'){const gx=((i*127.1+37)%1-.5)*W*.7;const gy=((i*311.7+13)%1-.5)*H*.6;
     return{x:cx+gx+Math.sin(t*.3+i)*5,y:cy+gy+Math.cos(t*.2+i)*5};}
@@ -105,7 +138,7 @@ C.addEventListener('click',e=>{
   let best=-1,bd=2500;
   for(let i=0;i<EXP.length;i++){const{x:px,y:py}=getPlanetPos(i);
     const dx=e.clientX-px,dy=e.clientY-py;if(dx*dx+dy*dy<bd){bd=dx*dx+dy*dy;best=i;}}
-  if(best>=0)location.href=EXP[best].href+'?seed='+cosmicSeed;});
+  if(best>=0){markVisit(EXP[best].href);location.href=EXP[best].href+'?seed='+cosmicSeed;}});
 
 // Visit counter + time tracking
 const _startT=Date.now();addEventListener('beforeunload',()=>{const spent=+(localStorage.getItem('suite_time')||0);localStorage.setItem('suite_time',''+(spent+Math.floor((Date.now()-_startT)/1000)));});
@@ -177,10 +210,31 @@ function anim(){requestAnimationFrame(anim);t+=.01;
     // Label — always show (dimmer when not hovered)
     X.globalAlpha=isHov?.5:.12;X.font=(isHov?'10':'7')+'px sans-serif';X.fillStyle='#fff';
     X.fillText(exp.name,px,py+sz+12);}
+  // Constellation lines — connect visited experiences
+  if(visitedExps.length>1){
+    X.strokeStyle='rgba(255,200,100,.06)';X.lineWidth=.5;
+    for(let a=0;a<visitedExps.length;a++){
+      for(let b=a+1;b<visitedExps.length;b++){
+        const pa=getPlanetPos(visitedExps[a]),pb=getPlanetPos(visitedExps[b]);
+        const d=Math.sqrt((pa.x-pb.x)**2+(pa.y-pb.y)**2);
+        if(d<400){X.globalAlpha=.04*(1-d/400);
+          X.beginPath();X.moveTo(pa.x,pa.y);X.lineTo(pb.x,pb.y);X.stroke();}
+      }
+    }
+    // Visited nodes glow brighter
+    for(const vi of visitedExps){
+      const vp=getPlanetPos(vi);
+      X.globalAlpha=.03;X.fillStyle='rgba(255,200,100,1)';
+      X.beginPath();X.arc(vp.x,vp.y,15,0,Math.PI*2);X.fill();
+    }
+  }
+  // Epoch indicator
+  X.globalAlpha=.06;X.fillStyle='#ffcc88';X.font='8px sans-serif';X.textAlign='center';
+  X.fillText('EPOCH: '+getEpoch(),cx,H-24);
   // Mini clock
   const now=new Date(),pad=n=>(''+n).padStart(2,'0');
   X.globalAlpha=.06;X.fillStyle='#fff';X.font='10px monospace';X.textAlign='center';
-  X.fillText(pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+' · 21 experiences · ~7700 lines · 0 dependencies',cx,H-10);
+  X.fillText(pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds())+' · '+EXP.length+' experiences · 0 dependencies',cx,H-10);
   X.globalAlpha=1;}
 anim();
 </script>
