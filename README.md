@@ -1,10 +1,10 @@
 # The Cosmic Suite
 
-![Lines](https://img.shields.io/badge/lines-15000-black?style=flat-square) ![Files](https://img.shields.io/badge/files-50_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-211-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
+![Lines](https://img.shields.io/badge/lines-15000+-black?style=flat-square) ![Files](https://img.shields.io/badge/files-51_HTML-black?style=flat-square) ![Commits](https://img.shields.io/badge/commits-213-black?style=flat-square) ![Deps](https://img.shields.io/badge/dependencies-0-black?style=flat-square)
 
 **50 cosmic experiences in pure HTML. No dependencies. No frameworks. Just the browser.**
 
-> *50 experiences. 15,000 lines. 211 commits. Zero dependencies. From nothing, everything.*
+> *From nothing, everything.*
 
 **[Enter the Suite](https://physics91.github.io/cosmic-suite/portal.html)**
 
@@ -52,6 +52,7 @@
 | ▒ | **Chaos Map** | Fractal × Pendulum · flip time boundary |
 | ☉ | **Orbits** | Launch planets · Kepler's laws · figure-8 |
 | ▓ | **Gravity Life** | Conway + gravity · life falls and sediments |
+| </> | **Quine** | A program that displays its own source as a galaxy |
 
 ### Play
 | | Name | What |
@@ -99,8 +100,9 @@ index.html           — Digital Cosmos (4679 lines, the flagship)
 ## Stats
 
 - **~15,000 lines** of hand-written code
-- **50 HTML files**, each fully self-contained
-- **211 git commits** in 24 hours
+- **51 HTML files**, each fully self-contained
+- **213 git commits** in 24 hours
+- **80 iterations** guided by dice rolls
 - **0 external dependencies**
 - **60 FPS** across all experiences
 - **50 unique experiences** across 4 categories
