@@ -45,6 +45,7 @@
   <button class="btn" onclick="pingpong=!pingpong;this.textContent=pingpong?'PingPong':'Normal'">Normal</button>
   <button class="btn" onclick="tapTempo()">Tap</button>
   <button class="btn" onclick="exportMidi()">Export</button>
+  <button class="btn" id="micBtn" onclick="toggleMicInput()">Mic OFF</button>
 </div>
 <canvas id="c"></canvas>
 <script>
@@ -137,6 +138,38 @@ C.addEventListener('contextmenu',e=>{e.preventDefault();
   if(best>=0)stars.splice(best,1);});
 
 $('bpmSlider').oninput=function(){bpm=+this.value;$('bpmVal').textContent=bpm;};
+
+// Mic input → pitch detection → auto-place stars
+let micOn=false,micAn=null,micData=null;
+function toggleMicInput(){
+  if(!micOn){
+    navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+      if(!aC)initAudio();
+      const src=aC.createMediaStreamSource(stream);
+      micAn=aC.createAnalyser();micAn.fftSize=2048;
+      src.connect(micAn);micData=new Float32Array(micAn.fftSize);
+      micOn=true;$('micBtn').textContent='Mic ON';}).catch(()=>alert('Mic denied'));}
+  else{micOn=false;$('micBtn').textContent='Mic OFF';}}
+
+function detectPitch(){
+  if(!micOn||!micAn)return;
+  micAn.getFloatTimeDomainData(micData);
+  // Autocorrelation pitch detection
+  let maxCorr=0,bestLag=0,rms=0;
+  for(let i=0;i<micData.length;i++)rms+=micData[i]*micData[i];
+  rms=Math.sqrt(rms/micData.length);
+  if(rms<.01)return;// too quiet
+  for(let lag=20;lag<500;lag++){let corr=0;
+    for(let i=0;i<micData.length-lag;i++)corr+=micData[i]*micData[i+lag];
+    if(corr>maxCorr){maxCorr=corr;bestLag=lag;}}
+  if(maxCorr<micData.length*.3)return;
+  const freq=aC.sampleRate/bestLag;if(freq<80||freq>1000)return;
+  // Map frequency to y position (pitch) and place star at current playPos x
+  const note=12*Math.log2(freq/440)+69;
+  const yNorm=1-(note-40)/40;// C2-C6 range
+  const y=Math.max(20,Math.min(H-40,yNorm*H));
+  const x=playPos*W/16+W/32;
+  stars.push(new MusicStar(x,y));}
 addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();togglePlay();}if(e.key==='r')randomize();if(e.key==='c')clearStars();if(e.key==='t')tapTempo();
   if(e.key==='z'&&stars.length){stars.pop();}// undo last star
   if(e.key==='s'){// Snap stars to nearest grid column
@@ -192,6 +225,8 @@ function anim(){requestAnimationFrame(anim);
   for(const s of stars){s.update();s.draw(X);
     if(s.ripple>0){X.globalAlpha=(s.ripple/30)*.1;X.strokeStyle='#fff';X.lineWidth=.5;
       X.beginPath();X.arc(s.x,s.y,(30-s.ripple)*2,0,Math.PI*2);X.stroke();s.ripple--;}}
+  // Mic pitch detection
+  if(micOn&&playing&&Date.now()%300<20)detectPitch();
   // Column density dots
   for(let col=0;col<16;col++){let count=0;for(const s of stars){if(s.getNoteInfo().col===col)count++;}
     if(count)for(let d=0;d<Math.min(count,5);d++){X.globalAlpha=.08;X.fillStyle='#ffcc44';X.beginPath();X.arc(col*W/16+W/32,H-8-d*4,1.5,0,Math.PI*2);X.fill();}}
