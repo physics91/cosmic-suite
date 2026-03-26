@@ -41,6 +41,9 @@ let entropy=0; // 0 = perfect order, 1 = maximum chaos
 let mouseX=W/2,mouseY=H/2,mouseActive=false;
 let orderForce=0; // how much user is imposing order
 let time=0,phase='order'; // order, transition, chaos, heat-death
+// Time reversal — record history
+let history=[],recording=true,reversing=false,reverseIdx=0;
+const MAX_HISTORY=600; // 10 seconds at 60fps
 
 const QUOTES=[
   'The entropy of the universe tends to a maximum. \u2014 Clausius',
@@ -83,9 +86,12 @@ addEventListener('touchstart',e=>{mouseX=e.touches[0].clientX;mouseY=e.touches[0
 addEventListener('touchmove',e=>{mouseX=e.touches[0].clientX;mouseY=e.touches[0].clientY;},{passive:true});
 addEventListener('touchend',()=>{orderForce=0;});
 addEventListener('keydown',e=>{
-  if(e.key==='r'){entropy=0;initParticles();phase='order';}
+  if(e.key==='r'){entropy=0;initParticles();phase='order';history=[];recording=true;reversing=false;}
   if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
   if(e.key===' '){e.preventDefault();orderForce=orderForce?0:1;}
+  if(e.key==='t'){// Time reversal!
+    if(!reversing&&history.length>0){reversing=true;recording=false;reverseIdx=history.length-1;}
+    else{reversing=false;recording=true;}}
 });
 
 // === ENTROPY CALCULATION ===
@@ -240,9 +246,27 @@ function anim(){requestAnimationFrame(anim);frame++;time+=.016;
     document.getElementById('quote').textContent=QUOTES[currentQuote];
   }
 
+  // Record/playback history
+  if(recording&&!reversing){
+    if(frame%2===0){ // Record every 2 frames
+      const snap=particles.map(p=>({x:p.x,y:p.y,vx:p.vx,vy:p.vy}));
+      history.push(snap);if(history.length>MAX_HISTORY)history.shift();
+    }
+  }
+  if(reversing&&reverseIdx>=0){
+    const snap=history[reverseIdx];
+    if(snap){for(let i=0;i<Math.min(particles.length,snap.length);i++){
+      particles[i].x=snap[i].x;particles[i].y=snap[i].y;
+      particles[i].vx=-snap[i].vx;particles[i].vy=-snap[i].vy;
+    }}
+    reverseIdx--;
+    if(reverseIdx<0){reversing=false;recording=true;}
+  }
+
   // Stats
   document.getElementById('stats').textContent=
-    'entropy: '+entropy.toFixed(3)+'\nphase: '+phase+'\nparticles: '+N+'\npress R to reset';
+    'entropy: '+entropy.toFixed(3)+'\nphase: '+phase+'\nparticles: '+N+
+    (reversing?'\n\u23ea REVERSING TIME ('+reverseIdx+')':'\nT=reverse R=reset');
 
   // Occasional sound
   if(frame%60===0&&orderForce){initAudio();playOrderTick();}
