@@ -34,44 +34,194 @@ const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
-// === GRAVITY WELLS ===
-const wells=[];
-let photonDensity=80;
+// === CONFIG ===
+const MAX_PHOTONS=10000;
+const TRAIL_LEN=30;
+let photonDensity=500; // Default higher with WASM
 let showGrid=true;
-let mode='lensing'; // lensing or orbit
+let mode='lensing';
 
+// === GRAVITY WELLS (JS-side, few objects) ===
+const wells=[];
 class GravityWell{
   constructor(x,y,mass){
     this.x=x;this.y=y;this.mass=mass||50;
     this.targetMass=this.mass;
     this.pulsePhase=Math.random()*Math.PI*2;
     this.color=`hsl(${260+Math.random()*40},70%,50%)`;
+    this.wasmIdx=-1; // attractor index in WASM
   }
 }
 
-// === PHOTONS ===
-const photons=[];
-class Photon{
-  constructor(){this.reset();}
-  reset(){
-    // Spawn from edges
-    const side=Math.random()*4|0;
-    if(side===0){this.x=0;this.y=Math.random()*H;this.vx=1;this.vy=(Math.random()-.5)*.3;}
-    else if(side===1){this.x=W;this.y=Math.random()*H;this.vx=-1;this.vy=(Math.random()-.5)*.3;}
-    else if(side===2){this.x=Math.random()*W;this.y=0;this.vx=(Math.random()-.5)*.3;this.vy=1;}
-    else{this.x=Math.random()*W;this.y=H;this.vx=(Math.random()-.5)*.3;this.vy=-1;}
-    const spd=2+Math.random();
-    const len=Math.sqrt(this.vx*this.vx+this.vy*this.vy);
-    this.vx=this.vx/len*spd;this.vy=this.vy/len*spd;
-    this.trail=[];this.life=1;this.hue=200+Math.random()*60;
-    this.captured=false;
+// === ORBIT MODE (JS-side, separate from WASM photons) ===
+const orbitParticles=[];
+class OrbitParticle{
+  constructor(x,y,vx,vy){
+    this.x=x;this.y=y;this.vx=vx;this.vy=vy;
+    this.trail=[];this.hue=Math.random()*360;this.life=1;
   }
 }
 
-function spawnPhotons(n){
-  for(let i=0;i<n;i++)photons.push(new Photon());
+function spawnOrbitRing(cx,cy,radius,count){
+  for(let i=0;i<count;i++){
+    const a=Math.PI*2*i/count;
+    const x=cx+Math.cos(a)*radius;
+    const y=cy+Math.sin(a)*radius;
+    const speed=Math.sqrt(50*30/radius);
+    orbitParticles.push(new OrbitParticle(x,y,-Math.sin(a)*speed,Math.cos(a)*speed));
+  }
 }
-spawnPhotons(photonDensity);
+
+// === PHOTON DATA (SoA TypedArrays — WASM or JS fallback) ===
+let photonCount=0;
+// Per-photon rendering state (not in WASM)
+let photonHue, photonCaptured, photonLife;
+// Trail ring buffer (pre-allocated, no GC)
+let trailX, trailY, trailHead;
+// WASM views
+let wasmPx, wasmPy, wasmVx, wasmVy;
+let wasmReady=false;
+let wasmExports=null;
+
+// JS fallback arrays
+let jsPx, jsPy, jsVx, jsVy;
+
+function initPhotonArrays(n){
+  photonHue=new Float32Array(n);
+  photonCaptured=new Uint8Array(n);
+  photonLife=new Float32Array(n);
+  trailX=new Float32Array(n*TRAIL_LEN);
+  trailY=new Float32Array(n*TRAIL_LEN);
+  trailHead=new Int32Array(n);
+  if(!wasmReady){
+    jsPx=new Float32Array(n);
+    jsPy=new Float32Array(n);
+    jsVx=new Float32Array(n);
+    jsVy=new Float32Array(n);
+  }
+}
+
+function resetPhoton(i){
+  const side=Math.random()*4|0;
+  let x,y,vx,vy;
+  if(side===0){x=0;y=Math.random()*H;vx=1;vy=(Math.random()-.5)*.3;}
+  else if(side===1){x=W;y=Math.random()*H;vx=-1;vy=(Math.random()-.5)*.3;}
+  else if(side===2){x=Math.random()*W;y=0;vx=(Math.random()-.5)*.3;vy=1;}
+  else{x=Math.random()*W;y=H;vx=(Math.random()-.5)*.3;vy=-1;}
+  const spd=2+Math.random();
+  const len=Math.sqrt(vx*vx+vy*vy);
+  vx=vx/len*spd;vy=vy/len*spd;
+
+  const px=wasmReady?wasmPx:jsPx;
+  const py=wasmReady?wasmPy:jsPy;
+  const pvx=wasmReady?wasmVx:jsVx;
+  const pvy=wasmReady?wasmVy:jsVy;
+  px[i]=x;py[i]=y;pvx[i]=vx;pvy[i]=vy;
+
+  photonHue[i]=200+Math.random()*60;
+  photonCaptured[i]=0;
+  photonLife[i]=1;
+  trailHead[i]=0;
+  // Clear trail
+  const base=i*TRAIL_LEN;
+  for(let t=0;t<TRAIL_LEN;t++){trailX[base+t]=x;trailY[base+t]=y;}
+}
+
+function setPhotonCount(n){
+  n=Math.min(n,MAX_PHOTONS);
+  if(wasmReady){
+    // Add/remove particles in WASM
+    const cur=wasmExports.nbody_get_count();
+    if(n>cur){
+      for(let i=cur;i<n;i++){
+        const side=Math.random()*4|0;
+        let x,y,vx,vy;
+        if(side===0){x=0;y=Math.random()*H;vx=1;vy=(Math.random()-.5)*.3;}
+        else if(side===1){x=W;y=Math.random()*H;vx=-1;vy=(Math.random()-.5)*.3;}
+        else if(side===2){x=Math.random()*W;y=0;vx=(Math.random()-.5)*.3;vy=1;}
+        else{x=Math.random()*W;y=H;vx=(Math.random()-.5)*.3;vy=-1;}
+        const spd=2+Math.random(),len=Math.sqrt(vx*vx+vy*vy);
+        vx=vx/len*spd;vy=vy/len*spd;
+        wasmExports.nbody_add(x,y,vx,vy,0);
+        photonHue[i]=200+Math.random()*60;
+        photonCaptured[i]=0;
+        photonLife[i]=1;
+        trailHead[i]=0;
+        const base=i*TRAIL_LEN;
+        for(let t=0;t<TRAIL_LEN;t++){trailX[base+t]=x;trailY[base+t]=y;}
+      }
+    }
+    // For removal, we just track photonCount and skip rendering beyond it
+  } else {
+    for(let i=photonCount;i<n;i++) resetPhoton(i);
+  }
+  photonCount=n;
+}
+
+let _wasmMem=null;
+function refreshWasmViews(){
+  if(!wasmExports||!_wasmMem)return;
+  const buf=_wasmMem.buffer;
+  wasmPx=new Float32Array(buf,wasmExports.nbody_get_px_ptr(),MAX_PHOTONS);
+  wasmPy=new Float32Array(buf,wasmExports.nbody_get_py_ptr(),MAX_PHOTONS);
+  wasmVx=new Float32Array(buf,wasmExports.nbody_get_vx_ptr(),MAX_PHOTONS);
+  wasmVy=new Float32Array(buf,wasmExports.nbody_get_vy_ptr(),MAX_PHOTONS);
+}
+
+// === WASM LOADING ===
+async function initWasm(){
+  try{
+    const resp=await WebAssembly.instantiateStreaming(fetch('./physics.wasm'),{
+      env:{abort:()=>{}}
+    });
+    wasmExports=resp.instance.exports;
+    _wasmMem=wasmExports.memory;
+
+    // Init nbody with MAX_PHOTONS capacity
+    wasmExports.nbody_init(MAX_PHOTONS,W,H);
+    wasmExports.nbody_set_params(0,0,1.0,9999); // No particle-particle gravity, no damping
+    wasmExports.nbody_set_speed_clamp(2.5); // Light speed
+    wasmExports.nbody_set_attractor_softening(500);
+
+    // Create TypedArray views over WASM memory
+    refreshWasmViews();
+
+    wasmReady=true;
+    console.log('WASM physics loaded — max photons:',MAX_PHOTONS);
+
+    // Spawn initial photons in WASM
+    initPhotonArrays(MAX_PHOTONS);
+    setPhotonCount(photonDensity);
+  }catch(e){
+    console.warn('WASM unavailable, using JS fallback:',e);
+    initPhotonArrays(MAX_PHOTONS);
+    setPhotonCount(photonDensity);
+  }
+}
+
+// === JS FALLBACK PHYSICS ===
+function stepPhysicsJS(dt){
+  for(let i=0;i<photonCount;i++){
+    let ax=0,ay=0;
+    for(const w of wells){
+      const dx=w.x-jsPx[i],dy=w.y-jsPy[i];
+      const d2=dx*dx+dy*dy;
+      const d=Math.sqrt(d2);
+      if(d<Math.sqrt(w.mass)*1.5){
+        if(!photonCaptured[i]){capturedCount++;playCapture();}
+        photonCaptured[i]=1;photonLife[i]-=.05;
+      }
+      const f=w.mass*30/(d2+500);
+      ax+=dx/d*f;ay+=dy/d*f;
+    }
+    jsVx[i]+=ax;jsVy[i]+=ay;
+    const spd=Math.sqrt(jsVx[i]*jsVx[i]+jsVy[i]*jsVy[i]);
+    const c=2.5;
+    jsVx[i]=jsVx[i]/spd*c;jsVy[i]=jsVy[i]/spd*c;
+    jsPx[i]+=jsVx[i];jsPy[i]+=jsVy[i];
+    if(jsPx[i]<-50||jsPx[i]>W+50||jsPy[i]<-50||jsPy[i]>H+50||photonLife[i]<=0) resetPhoton(i);
+  }
+}
 
 // === SPACETIME GRID ===
 function drawGrid(){
@@ -110,41 +260,29 @@ function drawGrid(){
   }
 }
 
-// === ORBIT MODE PARTICLES ===
-const orbitParticles=[];
-class OrbitParticle{
-  constructor(x,y,vx,vy){
-    this.x=x;this.y=y;this.vx=vx;this.vy=vy;
-    this.trail=[];this.hue=Math.random()*360;this.life=1;
-  }
-}
-
-function spawnOrbitRing(cx,cy,radius,count){
-  for(let i=0;i<count;i++){
-    const a=Math.PI*2*i/count;
-    const x=cx+Math.cos(a)*radius;
-    const y=cy+Math.sin(a)*radius;
-    const speed=Math.sqrt(50*30/radius);
-    orbitParticles.push(new OrbitParticle(x,y,-Math.sin(a)*speed,Math.cos(a)*speed));
-  }
-}
-
 // === INPUT ===
 let dragStart=null,dragWell=null;
 addEventListener('mousedown',e=>{
   if(e.button===2){
-    // Remove nearest well
     let best=-1,bd=2500;
     for(let i=0;i<wells.length;i++){
       const dx=wells[i].x-e.clientX,dy=wells[i].y-e.clientY;
       const d=dx*dx+dy*dy;if(d<bd){bd=d;best=i;}
     }
-    if(best>=0)wells.splice(best,1);
+    if(best>=0){
+      if(wasmReady&&wells[best].wasmIdx>=0) wasmExports.nbody_remove_attractor(wells[best].wasmIdx);
+      wells.splice(best,1);
+      // Re-sync attractor indices
+      syncAttractors();
+    }
     return;
   }
   dragStart={x:e.clientX,y:e.clientY};
   const w=new GravityWell(e.clientX,e.clientY,10);
   wells.push(w);dragWell=w;
+  if(wasmReady){
+    w.wasmIdx=wasmExports.nbody_add_attractor(w.x,w.y,w.mass);
+  }
   if(mode==='orbit')spawnOrbitRing(e.clientX,e.clientY,80,20);
 });
 addEventListener('mousemove',e=>{
@@ -157,9 +295,8 @@ addEventListener('mouseup',()=>{dragStart=null;dragWell=null;});
 addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('wheel',e=>{
   e.preventDefault();
-  photonDensity=Math.max(10,Math.min(300,photonDensity+(e.deltaY>0?-10:10)));
-  while(photons.length<photonDensity)photons.push(new Photon());
-  while(photons.length>photonDensity)photons.pop();
+  photonDensity=Math.max(10,Math.min(MAX_PHOTONS,photonDensity+(e.deltaY>0?-50:50)));
+  setPhotonCount(photonDensity);
 },{passive:false});
 addEventListener('keydown',e=>{
   if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
@@ -167,12 +304,20 @@ addEventListener('keydown',e=>{
   if(e.key==='c')clearAll();
 });
 
+function syncAttractors(){
+  if(!wasmReady)return;
+  wasmExports.nbody_clear_attractors();
+  for(const w of wells){
+    w.wasmIdx=wasmExports.nbody_add_attractor(w.x,w.y,w.mass);
+  }
+}
+
 function toggleGrid(){showGrid=!showGrid;document.getElementById('btnGrid').classList.toggle('active',showGrid);}
 function toggleMode(){mode=mode==='lensing'?'orbit':'lensing';document.getElementById('modeLabel').textContent=mode==='lensing'?'Lensing':'Orbit';}
-function clearAll(){wells.length=0;orbitParticles.length=0;}
-function presetBinary(){clearAll();wells.push(new GravityWell(W*.35,H*.5,80));wells.push(new GravityWell(W*.65,H*.5,80));if(mode==='orbit'){spawnOrbitRing(W*.35,H*.5,60,15);spawnOrbitRing(W*.65,H*.5,60,15);}}
-function presetTriple(){clearAll();for(let i=0;i<3;i++){const a=Math.PI*2*i/3-Math.PI/2;wells.push(new GravityWell(W/2+Math.cos(a)*150,H/2+Math.sin(a)*150,60));if(mode==='orbit')spawnOrbitRing(W/2+Math.cos(a)*150,H/2+Math.sin(a)*150,50,12);}}
-function presetCluster(){clearAll();for(let i=0;i<7;i++){wells.push(new GravityWell(W/2+(Math.random()-.5)*300,H/2+(Math.random()-.5)*300,20+Math.random()*60));}}
+function clearAll(){wells.length=0;orbitParticles.length=0;if(wasmReady)wasmExports.nbody_clear_attractors();}
+function presetBinary(){clearAll();wells.push(new GravityWell(W*.35,H*.5,80));wells.push(new GravityWell(W*.65,H*.5,80));syncAttractors();if(mode==='orbit'){spawnOrbitRing(W*.35,H*.5,60,15);spawnOrbitRing(W*.65,H*.5,60,15);}}
+function presetTriple(){clearAll();for(let i=0;i<3;i++){const a=Math.PI*2*i/3-Math.PI/2;wells.push(new GravityWell(W/2+Math.cos(a)*150,H/2+Math.sin(a)*150,60));}syncAttractors();if(mode==='orbit')for(const w of wells)spawnOrbitRing(w.x,w.y,50,12);}
+function presetCluster(){clearAll();for(let i=0;i<7;i++){wells.push(new GravityWell(W/2+(Math.random()-.5)*300,H/2+(Math.random()-.5)*300,20+Math.random()*60));}syncAttractors();}
 
 // === AUDIO ===
 let aC=null;
@@ -204,17 +349,16 @@ function anim(){requestAnimationFrame(anim);frame++;
   }
   X.globalAlpha=1;
 
-  // Spacetime grid
   drawGrid();
 
-  // Update wells
+  // Update wells (smooth mass transition + sync to WASM)
   for(const w of wells){
     w.mass+=(w.targetMass-w.mass)*.1;
     w.pulsePhase+=.03;
+    if(wasmReady&&w.wasmIdx>=0) wasmExports.nbody_update_attractor(w.wasmIdx,w.x,w.y,w.mass);
     // Draw well
     const pulse=1+Math.sin(w.pulsePhase)*.1;
     const r=Math.sqrt(w.mass)*2;
-    // Event horizon
     const grad=X.createRadialGradient(w.x,w.y,0,w.x,w.y,r*3*pulse);
     grad.addColorStop(0,'rgba(0,0,0,.9)');
     grad.addColorStop(.3,'rgba(40,20,80,.3)');
@@ -222,62 +366,85 @@ function anim(){requestAnimationFrame(anim);frame++;
     grad.addColorStop(1,'transparent');
     X.fillStyle=grad;
     X.beginPath();X.arc(w.x,w.y,r*3*pulse,0,Math.PI*2);X.fill();
-    // Accretion ring
     X.strokeStyle=w.color;X.lineWidth=1;X.globalAlpha=.15+Math.sin(w.pulsePhase*.5)*.05;
     X.beginPath();X.ellipse(w.x,w.y,r*2.5,r*.8,frame*.005,0,Math.PI*2);X.stroke();
     X.globalAlpha=.08;
     X.beginPath();X.ellipse(w.x,w.y,r*3,r*1.2,frame*.005+.3,0,Math.PI*2);X.stroke();
     X.globalAlpha=1;
-    // Core
     X.fillStyle='rgba(200,180,255,.08)';
     X.beginPath();X.arc(w.x,w.y,r*.3,0,Math.PI*2);X.fill();
   }
 
-  // Update & draw photons (lensing mode)
+  // === PHOTON PHYSICS + RENDER ===
   if(mode==='lensing'){
-    for(const p of photons){
-      // Gravity
-      for(const w of wells){
-        const dx=w.x-p.x,dy=w.y-p.y;
-        const d2=dx*dx+dy*dy;
-        const d=Math.sqrt(d2);
-        if(d<Math.sqrt(w.mass)*1.5){
-          // Captured
-          if(!p.captured){capturedCount++;playCapture();}
-          p.captured=true;p.life-=.05;
+    const px=wasmReady?wasmPx:jsPx;
+    const py=wasmReady?wasmPy:jsPy;
+
+    if(wasmReady){
+      wasmExports.nbody_step(1.0);
+      // Rebind views in case memory.grow occurred
+      if(wasmPx.buffer.byteLength===0) refreshWasmViews();
+      // Check captures + bounds (JS side, reading WASM memory)
+      const count=Math.min(photonCount,wasmExports.nbody_get_count());
+      for(let i=0;i<count;i++){
+        // Capture detection
+        for(const w of wells){
+          const dx=w.x-px[i],dy=w.y-py[i];
+          const d=Math.sqrt(dx*dx+dy*dy);
+          if(d<Math.sqrt(w.mass)*1.5){
+            if(!photonCaptured[i]){capturedCount++;playCapture();}
+            photonCaptured[i]=1;photonLife[i]-=.05;
+          }
         }
-        const f=w.mass*30/(d2+500);
-        p.vx+=dx/d*f;p.vy+=dy/d*f;
+        // Bounds check
+        if(px[i]<-50||px[i]>W+50||py[i]<-50||py[i]>H+50||photonLife[i]<=0){
+          resetPhoton(i);
+        }
+        // Update trail ring buffer
+        const head=trailHead[i];
+        const base=i*TRAIL_LEN;
+        trailX[base+head]=px[i];
+        trailY[base+head]=py[i];
+        trailHead[i]=(head+1)%TRAIL_LEN;
       }
-      // Normalize to light speed
-      const spd=Math.sqrt(p.vx*p.vx+p.vy*p.vy);
-      const c=2.5;
-      p.vx=p.vx/spd*c;p.vy=p.vy/spd*c;
-      p.x+=p.vx;p.y+=p.vy;
-      p.trail.push({x:p.x,y:p.y});
-      if(p.trail.length>30)p.trail.shift();
-      // Out of bounds or dead
-      if(p.x<-50||p.x>W+50||p.y<-50||p.y>H+50||p.life<=0)p.reset();
+    }else{
+      stepPhysicsJS(1);
+      for(let i=0;i<photonCount;i++){
+        const head=trailHead[i];
+        const base=i*TRAIL_LEN;
+        trailX[base+head]=px[i];
+        trailY[base+head]=py[i];
+        trailHead[i]=(head+1)%TRAIL_LEN;
+      }
+    }
+
+    // Render photons
+    for(let i=0;i<photonCount;i++){
+      const captured=photonCaptured[i];
+      const base=i*TRAIL_LEN;
+      const head=trailHead[i];
+
       // Draw trail
-      if(p.trail.length>1){
-        X.strokeStyle=p.captured?`hsla(280,80%,60%,.3)`:`hsla(${p.hue},60%,70%,.15)`;
-        X.lineWidth=p.captured?1.5:1;
-        X.beginPath();
-        for(let i=0;i<p.trail.length;i++){
-          const pt=p.trail[i];
-          i===0?X.moveTo(pt.x,pt.y):X.lineTo(pt.x,pt.y);
-        }
-        X.stroke();
+      X.strokeStyle=captured?'hsla(280,80%,60%,.3)':`hsla(${photonHue[i]|0},60%,70%,.15)`;
+      X.lineWidth=captured?1.5:1;
+      X.beginPath();
+      let started=false;
+      for(let t=0;t<TRAIL_LEN;t++){
+        const idx=base+((head+t)%TRAIL_LEN);
+        if(!started){X.moveTo(trailX[idx],trailY[idx]);started=true;}
+        else X.lineTo(trailX[idx],trailY[idx]);
       }
+      X.stroke();
+
       // Photon head
-      X.globalAlpha=p.captured?.4:.2;
-      X.fillStyle=p.captured?'#aa88ff':'#88bbff';
-      X.beginPath();X.arc(p.x,p.y,p.captured?1.5:1,0,Math.PI*2);X.fill();
+      X.globalAlpha=captured?.4:.2;
+      X.fillStyle=captured?'#aa88ff':'#88bbff';
+      X.beginPath();X.arc(px[i],py[i],captured?1.5:1,0,Math.PI*2);X.fill();
       X.globalAlpha=1;
     }
   }
 
-  // Orbit mode particles
+  // Orbit mode (stays in JS, not WASM)
   if(mode==='orbit'){
     for(let i=orbitParticles.length-1;i>=0;i--){
       const p=orbitParticles[i];
@@ -294,7 +461,6 @@ function anim(){requestAnimationFrame(anim);frame++;
       if(p.trail.length>60)p.trail.shift();
       if(p.x<-100||p.x>W+100||p.y<-100||p.y>H+100)p.life=0;
       if(p.life<=0){orbitParticles.splice(i,1);continue;}
-      // Draw
       if(p.trail.length>1){
         X.strokeStyle=`hsla(${p.hue},60%,60%,.12)`;X.lineWidth=1;
         X.beginPath();
@@ -311,9 +477,11 @@ function anim(){requestAnimationFrame(anim);frame++;
 
   // Stats
   document.getElementById('stats').textContent=
-    `wells: ${wells.length}\nphotons: ${photons.length}\ncaptured: ${capturedCount}\nmode: ${mode}`;
+    `wells: ${wells.length}\nphotons: ${photonCount}${wasmReady?' (WASM)':' (JS)'}\ncaptured: ${capturedCount}\nmode: ${mode}`;
 }
-anim();
+
+// Start
+initWasm().then(()=>anim());
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="gravity-well.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>

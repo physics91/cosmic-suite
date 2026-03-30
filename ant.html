@@ -33,6 +33,9 @@ let W,H;
 const CELL=2;
 let cols,rows,grid;
 
+// WASM state
+let wasm=null, wasmMemory=null, useWasm=false;
+
 function resize(){
   W=C.width=innerWidth;H=C.height=innerHeight;
   cols=Math.ceil(W/CELL);rows=Math.ceil(H/CELL);
@@ -56,20 +59,34 @@ class Ant{
 }
 
 function reset(){
-  grid=new Uint8Array(cols*rows);
-  ants=[new Ant(cols>>1,rows>>1,0)];
+  if(useWasm){
+    // ruleSet=3 for Langton's Ant
+    wasm.cellular_init(cols,rows,3);
+    wasm.cellular_clear();
+    // Add default ant at center
+    wasm.cellular_add_ant(cols>>1,rows>>1,0);
+    ants=[new Ant(cols>>1,rows>>1,0)]; // mirror for rendering ant positions
+    grid=new Uint8Array(wasm.memory.buffer, wasm.cellular_get_grid_ptr(), cols*rows);
+  }else{
+    grid=new Uint8Array(cols*rows);
+    ants=[new Ant(cols>>1,rows>>1,0)];
+  }
   steps=0;
   X.fillStyle='#000';X.fillRect(0,0,W,H);
 }
 
 function addAnt(){
-  ants.push(new Ant(cols>>1+(Math.random()-.5)*20|0,rows>>1+(Math.random()-.5)*20|0,Math.random()*4|0));
+  const ax=(cols>>1)+(Math.random()-.5)*20|0;
+  const ay=(rows>>1)+(Math.random()-.5)*20|0;
+  const adir=Math.random()*4|0;
+  if(useWasm){
+    wasm.cellular_add_ant(ax,ay,adir);
+  }
+  ants.push(new Ant(ax,ay,adir));
 }
 
 function cycleSpeed(){speed=speed>=500?10:speed>=100?speed+100:speed*2;document.getElementById('spdV').textContent=speed;}
 function cycleRule(){ruleIdx=(ruleIdx+1)%RULES_LIST.length;rule=RULES_LIST[ruleIdx];document.getElementById('ruleV').textContent=rule;reset();}
-
-resize();addEventListener('resize',resize);
 
 addEventListener('keydown',e=>{
   if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
@@ -83,7 +100,8 @@ const offC=document.createElement('canvas');
 const offX=offC.getContext('2d');
 let imgData=null;
 
-function step(){
+// JS fallback step (used when WASM is not available or rule != RL)
+function stepJS(){
   for(const ant of ants){
     if(ant.x<0||ant.x>=cols||ant.y<0||ant.y>=rows)continue;
     const i=ant.y*cols+ant.x;
@@ -103,6 +121,18 @@ function step(){
   steps++;
 }
 
+function step(){
+  if(useWasm && rule==='RL'){
+    // WASM handles stepping for classic RL rule
+    wasm.cellular_step(speed);
+    // Re-bind grid view in case memory grew
+    grid=new Uint8Array(wasm.memory.buffer, wasm.cellular_get_grid_ptr(), cols*rows);
+    steps+=speed;
+  }else{
+    for(let i=0;i<speed;i++)stepJS();
+  }
+}
+
 function render(){
   offC.width=cols;offC.height=rows;
   if(!imgData||imgData.width!==cols)imgData=new ImageData(cols,rows);
@@ -114,11 +144,13 @@ function render(){
     const c=STATE_COLORS[s%STATE_COLORS.length];
     d[pi]=c[0];d[pi+1]=c[1];d[pi+2]=c[2];d[pi+3]=255;
   }
-  // Draw ants as red dots
-  for(const ant of ants){
-    if(ant.x>=0&&ant.x<cols&&ant.y>=0&&ant.y<rows){
-      const pi=(ant.y*cols+ant.x)*4;
-      d[pi]=255;d[pi+1]=50;d[pi+2]=50;
+  // Draw ants as red dots (JS-tracked positions for non-WASM, grid-based for WASM)
+  if(!useWasm || rule!=='RL'){
+    for(const ant of ants){
+      if(ant.x>=0&&ant.x<cols&&ant.y>=0&&ant.y<rows){
+        const pi=(ant.y*cols+ant.x)*4;
+        d[pi]=255;d[pi+1]=50;d[pi+2]=50;
+      }
     }
   }
 
@@ -129,7 +161,7 @@ function render(){
 
 function anim(){
   requestAnimationFrame(anim);
-  for(let i=0;i<speed;i++)step();
+  step();
   render();
 
   // Phase detection
@@ -138,10 +170,27 @@ function anim(){
   document.getElementById('phase-label').style.color=
     phase==='CHAOS'?'rgba(255,100,80,.2)':phase==='SEARCHING'?'rgba(255,200,100,.2)':'rgba(100,255,150,.25)';
 
+  const engine=useWasm?'WASM':'JS';
   document.getElementById('stats').textContent=
-    'steps: '+steps+'\nants: '+ants.length+'\nrule: '+rule+'\nphase: '+phase.toLowerCase();
+    'steps: '+steps+'\nants: '+ants.length+'\nrule: '+rule+'\nphase: '+phase.toLowerCase()+'\nengine: '+engine;
 }
-anim();
+
+async function initWasm(){
+  try{
+    const result=await WebAssembly.instantiateStreaming(fetch('./physics.wasm'),{env:{abort:()=>{}}});
+    wasm=result.instance.exports;
+    useWasm=true;
+  }catch(e){
+    console.warn('WASM not available, using JS fallback:',e);
+    useWasm=false;
+  }
+}
+
+initWasm().then(()=>{
+  resize();
+  addEventListener('resize',resize);
+  anim();
+});
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="ant.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>

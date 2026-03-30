@@ -34,21 +34,72 @@ let W,H;
 const CELL=4;
 let cols,rows,grid,glow,age;
 let running=true,gen=0,speed=1,population=0;
+let useWasm=false,wasm=null;
+
+// === WASM LOADING ===
+async function initWasm(){
+  try{
+    const result=await WebAssembly.instantiateStreaming(fetch('./physics.wasm'),{env:{abort:()=>{}}});
+    wasm=result.instance.exports;
+    useWasm=true;
+    // Init WASM grid with current dimensions, ruleSet 0 = Conway
+    wasm.cellular_init(cols,rows,0);
+    // Sync current JS grid into WASM
+    syncJsToWasm();
+  }catch(e){
+    console.warn('WASM load failed, using JS fallback:',e);
+    useWasm=false;
+  }
+}
+
+function syncJsToWasm(){
+  if(!useWasm)return;
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+    wasm.cellular_set(x,y,grid[y*cols+x]);
+  }
+}
+
+function readWasmGrids(){
+  if(!useWasm)return;
+  const mem=wasm.memory.buffer;
+  const gridPtr=wasm.cellular_get_grid_ptr();
+  const glowPtr=wasm.cellular_get_glow_ptr();
+  const agePtr=wasm.cellular_get_age_ptr();
+  const total=cols*rows;
+  grid=new Uint8Array(mem,gridPtr,total);
+  glow=new Float32Array(mem,glowPtr,total);
+  age=new Uint16Array(mem,agePtr,total);
+}
 
 function resize(){
   W=C.width=innerWidth;H=C.height=innerHeight;
-  cols=Math.ceil(W/CELL);rows=Math.ceil(H/CELL);
-  const newGrid=new Uint8Array(cols*rows);
-  const newGlow=new Float32Array(cols*rows);
-  const newAge=new Uint16Array(cols*rows);
-  if(grid){for(let y=0;y<Math.min(rows,(grid.length/cols)|0);y++)for(let x=0;x<Math.min(cols,grid.length);x++){const i=y*cols+x;if(i<newGrid.length&&y*cols+x<grid.length){newGrid[i]=grid[y*cols+x]||0;}}}
+  const newCols=Math.ceil(W/CELL),newRows=Math.ceil(H/CELL);
+  const newGrid=new Uint8Array(newCols*newRows);
+  const newGlow=new Float32Array(newCols*newRows);
+  const newAge=new Uint16Array(newCols*newRows);
+  if(grid){
+    for(let y=0;y<Math.min(newRows,rows);y++)
+      for(let x=0;x<Math.min(newCols,cols);x++){
+        const ni=y*newCols+x;
+        const oi=y*cols+x;
+        newGrid[ni]=grid[oi]||0;
+        newGlow[ni]=glow[oi]||0;
+        newAge[ni]=age[oi]||0;
+      }
+  }
+  cols=newCols;rows=newRows;
   grid=newGrid;glow=newGlow;age=newAge;
+  if(useWasm){
+    wasm.cellular_init(cols,rows,0);
+    syncJsToWasm();
+  }
 }
 resize();addEventListener('resize',resize);
 
 function idx(x,y){return((y%rows)+rows)%rows*cols+((x%cols)+cols)%cols;}
 
-function step(){
+// === JS FALLBACK STEP ===
+function stepJS(){
   const next=new Uint8Array(cols*rows);
   population=0;
   for(let y=0;y<rows;y++){
@@ -62,11 +113,11 @@ function step(){
       const alive=grid[i];
       if(alive){
         next[i]=(neighbors===2||neighbors===3)?1:0;
-        if(!next[i])glow[i]=1; // death glow
-        else age[i]++; // survivor ages
+        if(!next[i])glow[i]=1;
+        else age[i]++;
       }else{
         next[i]=neighbors===3?1:0;
-        if(next[i]){glow[i]=1;age[i]=0;} // birth glow, reset age
+        if(next[i]){glow[i]=1;age[i]=0;}
       }
       if(!next[i])age[i]=0;
       if(next[i])population++;
@@ -75,12 +126,51 @@ function step(){
   grid=next;gen++;
 }
 
-function randomize(){
-  for(let i=0;i<grid.length;i++)grid[i]=Math.random()<.15?1:0;
-  glow.fill(0);gen=0;
+// === WASM STEP ===
+function stepWasm(steps){
+  wasm.cellular_step(steps||1);
+  readWasmGrids();
+  // Count population from WASM grid
+  population=0;
+  const total=cols*rows;
+  for(let i=0;i<total;i++)if(grid[i])population++;
+  gen+=steps||1;
 }
 
-function clear_(){grid.fill(0);glow.fill(0);gen=0;}
+function step(){
+  if(useWasm){
+    stepWasm(1);
+  }else{
+    stepJS();
+  }
+}
+
+function randomize(){
+  if(useWasm){
+    wasm.cellular_clear();
+    for(let i=0;i<cols*rows;i++){
+      if(Math.random()<.15){
+        const x=i%cols,y=(i/cols)|0;
+        wasm.cellular_set(x,y,1);
+      }
+    }
+    readWasmGrids();
+  }else{
+    for(let i=0;i<grid.length;i++)grid[i]=Math.random()<.15?1:0;
+    glow.fill(0);
+  }
+  gen=0;
+}
+
+function clear_(){
+  if(useWasm){
+    wasm.cellular_clear();
+    readWasmGrids();
+  }else{
+    grid.fill(0);glow.fill(0);
+  }
+  gen=0;
+}
 
 // === PATTERNS ===
 const PATTERNS={
@@ -121,9 +211,16 @@ function placePattern(name){
   const cx=Math.floor(placeMX/CELL)-Math.floor(p[0].length/2);
   const cy=Math.floor(placeMY/CELL)-Math.floor(p.length/2);
   for(let y=0;y<p.length;y++)for(let x=0;x<p[y].length;x++){
-    const gi=idx(cx+x,cy+y);
-    grid[gi]=p[y][x];if(p[y][x])glow[gi]=1;
+    if(useWasm){
+      const wx=((cx+x)%cols+cols)%cols;
+      const wy=((cy+y)%rows+rows)%rows;
+      wasm.cellular_set(wx,wy,p[y][x]);
+    }else{
+      const gi=idx(cx+x,cy+y);
+      grid[gi]=p[y][x];if(p[y][x])glow[gi]=1;
+    }
   }
+  if(useWasm)readWasmGrids();
 }
 
 // === INPUT ===
@@ -139,9 +236,16 @@ function paint(mx,my){
   const cx=Math.floor(mx/CELL),cy=Math.floor(my/CELL);
   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
     if(Math.random()<.6){
-      const gi=idx(cx+dx,cy+dy);grid[gi]=1;glow[gi]=1;
+      if(useWasm){
+        const wx=((cx+dx)%cols+cols)%cols;
+        const wy=((cy+dy)%rows+rows)%rows;
+        wasm.cellular_set(wx,wy,1);
+      }else{
+        const gi=idx(cx+dx,cy+dy);grid[gi]=1;glow[gi]=1;
+      }
     }
   }
+  if(useWasm)readWasmGrids();
 }
 
 addEventListener('keydown',e=>{
@@ -161,8 +265,10 @@ const offC=document.createElement('canvas');
 const offX=offC.getContext('2d');
 
 function render(){
-  // Decay glow
-  for(let i=0;i<glow.length;i++)if(glow[i]>0)glow[i]*=.92;
+  // Decay glow (JS-side for both modes since WASM glow handles its own decay)
+  if(!useWasm){
+    for(let i=0;i<glow.length;i++)if(glow[i]>0)glow[i]*=.92;
+  }
 
   offC.width=cols;offC.height=rows;
   if(!imgData||imgData.width!==cols)imgData=new ImageData(cols,rows);
@@ -196,16 +302,31 @@ function render(){
   X.imageSmoothingEnabled=false;
   X.drawImage(offC,0,0,cols,rows,0,0,W,H);
 
+  const engine=useWasm?'WASM':'JS';
   document.getElementById('stats').textContent=
-    'gen: '+gen+'\npop: '+population+'\ncells: '+cols+'x'+rows+'\nspeed: '+speed+'x';
+    'gen: '+gen+'\npop: '+population+'\ncells: '+cols+'x'+rows+'\nspeed: '+speed+'x\nengine: '+engine;
 }
 
 function anim(){
   requestAnimationFrame(anim);
-  if(running)for(let i=0;i<speed;i++)step();
+  if(running){
+    if(useWasm){
+      stepWasm(speed);
+    }else{
+      for(let i=0;i<speed;i++)stepJS();
+    }
+  }
   render();
 }
-anim();
+
+// Boot: try WASM first, then start animation
+initWasm().then(()=>{
+  if(useWasm){
+    // Re-randomize through WASM now that it's loaded
+    randomize();
+  }
+  anim();
+});
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="conway.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>

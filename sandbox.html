@@ -32,6 +32,11 @@ let W,H;
 const RES=3;
 let cols,rows,grid;
 
+// === WASM STATE ===
+let wasmReady=false;
+let wasmExports=null;
+let useWasm=false;
+
 // Elements: 0=empty, 1=sand, 2=water, 3=fire, 4=smoke, 5=wall, 6=oil, 7=acid
 const ELEMENTS=[
   {id:0,name:'Erase',color:'#111',bg:'rgba(30,30,30,.8)'},
@@ -56,14 +61,50 @@ ELEMENTS.forEach((e,i)=>{
 
 function resize(){
   W=C.width=innerWidth;H=C.height=innerHeight;
-  cols=Math.ceil(W/RES);rows=Math.ceil(H/RES);
-  const newGrid=new Uint8Array(cols*rows);
-  if(grid){for(let i=0;i<Math.min(grid.length,newGrid.length);i++)newGrid[i]=grid[i];}
+  const newCols=Math.ceil(W/RES),newRows=Math.ceil(H/RES);
+  const newGrid=new Uint8Array(newCols*newRows);
+  if(grid){
+    const minC=Math.min(cols,newCols),minR=Math.min(rows,newRows);
+    for(let y=0;y<minR;y++)for(let x=0;x<minC;x++)newGrid[y*newCols+x]=grid[y*cols+x];
+  }
+  cols=newCols;rows=newRows;
   grid=newGrid;
+  // Re-init WASM grid on resize
+  if(wasmReady){
+    wasmExports.cellular_init(cols,rows,2);
+    syncGridToWasm();
+  }
 }
+
+function syncGridToWasm(){
+  if(!wasmReady)return;
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+    const t=grid[y*cols+x];
+    // WASM only knows 0-3; map wall/oil/acid/smoke to 0 for WASM
+    wasmExports.cellular_set(x,y,t<=3?t:0);
+  }
+}
+
+function syncGridFromWasm(){
+  if(!wasmReady)return;
+  const ptr=wasmExports.cellular_get_grid_ptr();
+  const wasmGrid=new Uint8Array(wasmExports.memory.buffer,ptr,cols*rows);
+  for(let i=0;i<cols*rows;i++){
+    const jsType=grid[i];
+    // Only overwrite cells that WASM manages (0-3)
+    // Preserve JS-only types (4-7)
+    if(jsType<=3){
+      grid[i]=wasmGrid[i];
+    }
+  }
+}
+
 resize();addEventListener('resize',resize);
 
-function clearAll(){grid.fill(0);}
+function clearAll(){
+  grid.fill(0);
+  if(wasmReady)wasmExports.cellular_clear();
+}
 
 function idx(x,y){
   if(x<0||x>=cols||y<0||y>=rows)return-1;
@@ -99,9 +140,22 @@ function paint(mx,my){
       if(dx*dx+dy*dy>brushSize*brushSize)continue;
       const px=cx+dx,py=cy+dy;
       if(px<0||px>=cols||py<0||py>=rows)continue;
-      if(selected===0){set(px,py,0);}
-      else if(selected===3){if(Math.random()<.5)set(px,py,3);} // fire is sparse
-      else{set(px,py,selected);}
+      if(selected===0){
+        set(px,py,0);
+        if(wasmReady)wasmExports.cellular_set(px,py,0);
+      }
+      else if(selected===3){
+        if(Math.random()<.5){set(px,py,3);if(wasmReady)wasmExports.cellular_set(px,py,3);}
+      }
+      else if(selected<=3){
+        // WASM-managed types (1=sand, 2=water)
+        set(px,py,selected);
+        if(wasmReady)wasmExports.cellular_set(px,py,selected);
+      }
+      else{
+        // JS-only types (4=smoke, 5=wall, 6=oil, 7=acid)
+        set(px,py,selected);
+      }
     }
   }
 }
@@ -116,7 +170,10 @@ addEventListener('keydown',e=>{
 
 // === PHYSICS ===
 let updated=new Uint8Array(0); // prevent double-updating
-function simulate(){
+
+// JS fallback physics for types 4-7 (smoke, wall, oil, acid)
+// Also full JS fallback when WASM is not available
+function simulateJS(fullMode){
   if(updated.length!==cols*rows)updated=new Uint8Array(cols*rows);
   updated.fill(0);
 
@@ -130,6 +187,9 @@ function simulate(){
       if(updated[i])continue;
       const type=grid[i];
       if(type===0||type===5)continue; // empty or wall
+
+      // In WASM mode, skip types 0-3 (handled by WASM)
+      if(!fullMode&&type<=3)continue;
 
       if(type===1){// SAND — falls, piles
         const below=get(x,y+1);
@@ -195,6 +255,21 @@ function simulate(){
   }
 }
 
+function simulate(){
+  if(useWasm){
+    // Sync JS-only types (4-7) into WASM grid as empty so WASM doesn't collide
+    // Then step WASM for types 0-3, read back, and run JS for types 4-7
+    syncGridToWasm();
+    wasmExports.cellular_step(1);
+    syncGridFromWasm();
+    // Run JS physics for extended types (4=smoke, 5=wall, 6=oil, 7=acid)
+    simulateJS(false);
+  }else{
+    // Full JS fallback
+    simulateJS(true);
+  }
+}
+
 // === RENDER ===
 let imgData=null;
 const offC=document.createElement('canvas');
@@ -231,8 +306,25 @@ function render(){
   X.drawImage(offC,0,0,cols,rows,0,0,W,H);
 
   const total=counts[1]+counts[2]+counts[3]+counts[4]+counts[5]+counts[6]+counts[7];
+  const engine=useWasm?'WASM':'JS';
   document.getElementById('stats').textContent=
-    'particles: '+total+' | sand:'+counts[1]+' water:'+counts[2]+' fire:'+counts[3]+' smoke:'+counts[4]+' oil:'+counts[6]+' acid:'+counts[7];
+    'particles: '+total+' | sand:'+counts[1]+' water:'+counts[2]+' fire:'+counts[3]+' smoke:'+counts[4]+' oil:'+counts[6]+' acid:'+counts[7]+' | '+engine;
+}
+
+// === WASM INIT ===
+async function initWasm(){
+  try{
+    const result=await WebAssembly.instantiateStreaming(fetch('./physics.wasm'),{env:{abort:()=>{}}});
+    wasmExports=result.instance.exports;
+    wasmExports.cellular_init(cols,rows,2);
+    wasmReady=true;
+    useWasm=true;
+    console.log('WASM physics engine loaded');
+  }catch(e){
+    console.warn('WASM load failed, using JS fallback:',e);
+    wasmReady=false;
+    useWasm=false;
+  }
 }
 
 function anim(){
@@ -240,7 +332,8 @@ function anim(){
   simulate();
   render();
 }
-anim();
+
+initWasm().then(()=>anim());
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="sandbox.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>

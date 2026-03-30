@@ -37,6 +37,40 @@ const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
+// === WASM PHYSICS ENGINE ===
+let wasmReady=false;
+let wasmExports=null;
+let wasmSamplesPtr=0, wasmMagPtr=0, wasmPhasePtr=0, wasmOutPtr=0;
+let wasmSamples=null, wasmMag=null, wasmPhase=null, wasmOut=null;
+
+async function initWasm(){
+  try{
+    const result=await WebAssembly.instantiateStreaming(fetch('./physics.wasm'),{env:{abort:()=>{}}});
+    wasmExports=result.instance.exports;
+    wasmExports.dft_init(SAMPLES);
+
+    // Allocate WASM buffers: samples, magnitudes, phases, output
+    const floatBytes=4;
+    wasmSamplesPtr=wasmExports.rawAlloc(SAMPLES*floatBytes);
+    wasmMagPtr=wasmExports.rawAlloc(32*floatBytes);
+    wasmPhasePtr=wasmExports.rawAlloc(32*floatBytes);
+    wasmOutPtr=wasmExports.rawAlloc(SAMPLES*floatBytes);
+
+    // Create Float32Array views over WASM linear memory
+    const mem=wasmExports.memory.buffer;
+    wasmSamples=new Float32Array(mem,wasmSamplesPtr,SAMPLES);
+    wasmMag=new Float32Array(mem,wasmMagPtr,32);
+    wasmPhase=new Float32Array(mem,wasmPhasePtr,32);
+    wasmOut=new Float32Array(mem,wasmOutPtr,SAMPLES);
+
+    wasmReady=true;
+    console.log('WASM physics engine loaded');
+  }catch(e){
+    console.warn('WASM load failed, using JS fallback:',e);
+    wasmReady=false;
+  }
+}
+
 // === WAVEFORM DATA ===
 const SAMPLES=512;
 let waveform=new Float32Array(SAMPLES); // -1 to 1
@@ -80,30 +114,52 @@ function updateOscillators(){
   }
 }
 
-// === DFT — compute harmonics from waveform ===
+// === DFT — compute harmonics from waveform (WASM with JS fallback) ===
 function computeHarmonics(){
-  for(let k=0;k<32;k++){
-    let re=0,im=0;
-    for(let n=0;n<SAMPLES;n++){
-      const angle=2*Math.PI*k*n/SAMPLES;
-      re+=waveform[n]*Math.cos(angle);
-      im-=waveform[n]*Math.sin(angle);
+  if(wasmReady){
+    // Copy waveform into WASM memory
+    wasmSamples.set(waveform);
+    // Run WASM DFT forward
+    wasmExports.dft_forward(wasmSamplesPtr,SAMPLES,wasmMagPtr,wasmPhasePtr,32);
+    // Read results back
+    harmonics.set(wasmMag);
+    phases.set(wasmPhase);
+  }else{
+    // JS fallback — original DFT implementation
+    for(let k=0;k<32;k++){
+      let re=0,im=0;
+      for(let n=0;n<SAMPLES;n++){
+        const angle=2*Math.PI*k*n/SAMPLES;
+        re+=waveform[n]*Math.cos(angle);
+        im-=waveform[n]*Math.sin(angle);
+      }
+      re/=SAMPLES;im/=SAMPLES;
+      harmonics[k]=Math.sqrt(re*re+im*im)*2;
+      phases[k]=Math.atan2(im,re);
     }
-    re/=SAMPLES;im/=SAMPLES;
-    harmonics[k]=Math.sqrt(re*re+im*im)*2;
-    phases[k]=Math.atan2(im,re);
   }
 }
 
-// === INVERSE — reconstruct waveform from harmonics ===
+// === INVERSE — reconstruct waveform from harmonics (WASM with JS fallback) ===
 function reconstructWaveform(){
-  for(let n=0;n<SAMPLES;n++){
-    let v=0;
-    for(let k=0;k<32;k++){
-      if(harmonics[k]<.005)continue;
-      v+=harmonics[k]*Math.cos(2*Math.PI*k*n/SAMPLES+phases[k]);
+  if(wasmReady){
+    // Copy harmonics and phases into WASM memory
+    wasmMag.set(harmonics);
+    wasmPhase.set(phases);
+    // Run WASM DFT inverse
+    wasmExports.dft_inverse(wasmMagPtr,wasmPhasePtr,32,wasmOutPtr,SAMPLES);
+    // Read reconstructed waveform back
+    waveform.set(wasmOut);
+  }else{
+    // JS fallback — original IDFT implementation
+    for(let n=0;n<SAMPLES;n++){
+      let v=0;
+      for(let k=0;k<32;k++){
+        if(harmonics[k]<.005)continue;
+        v+=harmonics[k]*Math.cos(2*Math.PI*k*n/SAMPLES+phases[k]);
+      }
+      waveform[n]=v;
     }
-    waveform[n]=v;
   }
 }
 
@@ -349,10 +405,13 @@ function anim(){requestAnimationFrame(anim);frame++;
   // Stats
   const dominant=harmonics.indexOf(Math.max(...harmonics));
   const fundFreq=110*(dominant+1);
+  const backend=wasmReady?'WASM':'JS';
   document.getElementById('stats').textContent=
-    `fundamental: ${fundFreq} Hz\nharmonics: ${harmonics.filter(h=>h>.01).length}\nsamples: ${SAMPLES}`;
+    `fundamental: ${fundFreq} Hz\nharmonics: ${harmonics.filter(h=>h>.01).length}\nsamples: ${SAMPLES}\nbackend: ${backend}`;
 }
-anim();
+
+// === BOOT: load WASM then start animation ===
+initWasm().then(()=>anim());
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="fourier.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>

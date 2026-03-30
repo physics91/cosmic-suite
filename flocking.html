@@ -31,40 +31,144 @@ const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
-// === BOIDS ===
-const boids=[];
-const predators=[];
+// === CONSTANTS ===
+const MAX_BOIDS=10000;
+const TRAIL_LEN=15;
+const COLORS=['#88ccff','#ff8866','#66ffaa','#ffcc44','#cc88ff'];
+const PERCEPTION=60,SEP_DIST=25,MAX_SPEED=4,MAX_FORCE=0.15;
+
+// === STATE ===
 let showTrails=true,numSpecies=1;
 let mx=W/2,my=H/2,mouseActive=false;
+let boidCount=0;
+let wasmReady=false;
+let wasmExports=null;
 
-const COLORS=['#88ccff','#ff8866','#66ffaa','#ffcc44','#cc88ff'];
-
-class Boid{
-  constructor(x,y,species){
-    this.x=x||Math.random()*W;this.y=y||Math.random()*H;
-    this.vx=(Math.random()-.5)*4;this.vy=(Math.random()-.5)*4;
-    this.species=species||0;
-    this.trail=[];
-  }
-}
-
+// === PREDATORS (stay in JS — few objects) ===
+const predators=[];
 class Predator{
   constructor(x,y){
     this.x=x;this.y=y;this.vx=(Math.random()-.5)*2;this.vy=(Math.random()-.5)*2;
   }
 }
 
-function addBoids(n,species){
-  for(let i=0;i<n;i++)boids.push(new Boid(null,null,species||0));
+// === BOID DATA: SoA layout (WASM views or JS fallback) ===
+let wasmPx,wasmPy,wasmVx,wasmVy,wasmType;
+let jsPx,jsPy,jsVx,jsVy,jsType;
+
+// Per-boid rendering state (always JS)
+let boidSpecies;   // Float32Array — species index per boid
+let boidHue;       // Float32Array — cached hue for rendering
+
+// Trail ring buffer (pre-allocated, no GC)
+let trailX,trailY,trailHead;
+
+function initArrays(n){
+  boidSpecies=new Float32Array(n);
+  boidHue=new Float32Array(n);
+  trailX=new Float32Array(n*TRAIL_LEN);
+  trailY=new Float32Array(n*TRAIL_LEN);
+  trailHead=new Int32Array(n);
+  if(!wasmReady){
+    jsPx=new Float32Array(n);
+    jsPy=new Float32Array(n);
+    jsVx=new Float32Array(n);
+    jsVy=new Float32Array(n);
+    jsType=new Float32Array(n);
+  }
 }
+
+// === WASM LOADING ===
+async function initWasm(){
+  try{
+    const resp=await WebAssembly.instantiateStreaming(fetch('./physics.wasm'),{
+      env:{abort:()=>{}}
+    });
+    wasmExports=resp.instance.exports;
+    const mem=wasmExports.memory;
+
+    wasmExports.boids_init(MAX_BOIDS,W,H);
+    wasmExports.boids_set_params(
+      25.0,   // separation weight
+      0.05,   // alignment weight
+      0.003,  // cohesion weight
+      MAX_SPEED,
+      MAX_FORCE,
+      PERCEPTION,
+      SEP_DIST
+    );
+
+    const pxPtr=wasmExports.boids_get_px_ptr();
+    const pyPtr=wasmExports.boids_get_py_ptr();
+    const vxPtr=wasmExports.boids_get_vx_ptr();
+    const vyPtr=wasmExports.boids_get_vy_ptr();
+    const typePtr=wasmExports.boids_get_type_ptr();
+    wasmPx=new Float32Array(mem.buffer,pxPtr,MAX_BOIDS);
+    wasmPy=new Float32Array(mem.buffer,pyPtr,MAX_BOIDS);
+    wasmVx=new Float32Array(mem.buffer,vxPtr,MAX_BOIDS);
+    wasmVy=new Float32Array(mem.buffer,vyPtr,MAX_BOIDS);
+    wasmType=new Float32Array(mem.buffer,typePtr,MAX_BOIDS);
+
+    wasmReady=true;
+    console.log('WASM boids loaded — max:',MAX_BOIDS);
+
+    initArrays(MAX_BOIDS);
+    addBoids(1000);
+  }catch(e){
+    console.warn('WASM unavailable, using JS fallback:',e);
+    initArrays(MAX_BOIDS);
+    addBoids(1000);
+  }
+}
+
+// === BOID MANAGEMENT ===
+function addBoid(x,y,species){
+  if(boidCount>=MAX_BOIDS)return;
+  const i=boidCount;
+  const bx=x!=null?x:Math.random()*W;
+  const by=y!=null?y:Math.random()*H;
+  const bvx=(Math.random()-.5)*4;
+  const bvy=(Math.random()-.5)*4;
+  const sp=species||0;
+
+  if(wasmReady){
+    wasmExports.boids_add(bx,by,bvx,bvy,sp);
+  }else{
+    jsPx[i]=bx;jsPy[i]=by;jsVx[i]=bvx;jsVy[i]=bvy;jsType[i]=sp;
+  }
+
+  boidSpecies[i]=sp;
+  boidHue[i]=0; // not used, we use COLORS[species]
+  trailHead[i]=0;
+  const base=i*TRAIL_LEN;
+  for(let t=0;t<TRAIL_LEN;t++){trailX[base+t]=bx;trailY[base+t]=by;}
+  boidCount++;
+}
+
+function addBoids(n,species){
+  for(let i=0;i<n;i++)addBoid(null,null,species!=null?species:0);
+}
+
 function addPredator(){predators.push(new Predator(W/2,H/2));}
-function clearAll(){boids.length=0;predators.length=0;}
-function cycleSpecies(){numSpecies=numSpecies>=5?1:numSpecies+1;document.getElementById('spV').textContent=numSpecies;
-  clearAll();for(let s=0;s<numSpecies;s++)addBoids(Math.floor(150/numSpecies),s);}
 
-// Init
-addBoids(200);
+function clearAll(){
+  boidCount=0;
+  predators.length=0;
+  // Re-init WASM boids module to reset count
+  if(wasmReady){
+    wasmExports.boids_init(MAX_BOIDS,W,H);
+    wasmExports.boids_set_params(25.0,0.05,0.003,MAX_SPEED,MAX_FORCE,PERCEPTION,SEP_DIST);
+  }
+}
 
+function cycleSpecies(){
+  numSpecies=numSpecies>=5?1:numSpecies+1;
+  document.getElementById('spV').textContent=numSpecies;
+  clearAll();
+  for(let s=0;s<numSpecies;s++)addBoids(Math.floor(1000/numSpecies),s);
+}
+
+// === INPUT ===
 addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;mouseActive=true;});
 addEventListener('keydown',e=>{
   if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
@@ -72,79 +176,74 @@ addEventListener('keydown',e=>{
   if(e.key==='c')clearAll();
 });
 addEventListener('click',e=>{if(e.target.closest('.btn,a'))return;
-  for(let i=0;i<20;i++)boids.push(new Boid(e.clientX+(Math.random()-.5)*30,e.clientY+(Math.random()-.5)*30,Math.floor(Math.random()*numSpecies)));});
-// Touch
+  for(let i=0;i<20;i++)addBoid(e.clientX+(Math.random()-.5)*30,e.clientY+(Math.random()-.5)*30,Math.floor(Math.random()*numSpecies));
+});
 addEventListener('touchstart',e=>{mx=e.touches[0].clientX;my=e.touches[0].clientY;mouseActive=true;},{passive:true});
 addEventListener('touchmove',e=>{mx=e.touches[0].clientX;my=e.touches[0].clientY;},{passive:true});
 
-// === BOID RULES ===
-const PERCEPTION=60,SEP_DIST=25,MAX_SPEED=4,MAX_FORCE=.15;
-
-function updateBoids(){
-  for(const b of boids){
+// === JS FALLBACK PHYSICS ===
+function stepPhysicsJS(){
+  for(let i=0;i<boidCount;i++){
     let sepX=0,sepY=0,sepN=0;
     let aliX=0,aliY=0,aliN=0;
     let cohX=0,cohY=0,cohN=0;
 
-    for(const other of boids){
-      if(other===b)continue;
-      const dx=other.x-b.x,dy=other.y-b.y;
+    const bx=jsPx[i],by=jsPy[i],bvx=jsVx[i],bvy=jsVy[i],bsp=jsType[i];
+
+    for(let j=0;j<boidCount;j++){
+      if(j===i)continue;
+      const dx=jsPx[j]-bx,dy=jsPy[j]-by;
       const d=Math.sqrt(dx*dx+dy*dy);
       if(d>PERCEPTION)continue;
-      const sameSpecies=other.species===b.species;
+      const sameSpecies=jsType[j]===bsp;
 
-      // Separation — avoid crowding (all species)
       if(d<SEP_DIST&&d>0){sepX-=dx/d;sepY-=dy/d;sepN++;}
-      // Alignment — match heading (same species only)
-      if(sameSpecies){aliX+=other.vx;aliY+=other.vy;aliN++;}
-      // Cohesion — move toward center (same species only)
-      if(sameSpecies){cohX+=other.x;cohY+=other.y;cohN++;}
+      if(sameSpecies){aliX+=jsVx[j];aliY+=jsVy[j];aliN++;}
+      if(sameSpecies){cohX+=jsPx[j];cohY+=jsPy[j];cohN++;}
     }
 
     let fx=0,fy=0;
-    // Separation
     if(sepN>0){fx+=sepX/sepN*1.5;fy+=sepY/sepN*1.5;}
-    // Alignment
-    if(aliN>0){const ax=aliX/aliN-b.vx,ay=aliY/aliN-b.vy;fx+=ax*.05;fy+=ay*.05;}
-    // Cohesion
-    if(cohN>0){const cx=cohX/cohN-b.x,cy=cohY/cohN-b.y;fx+=cx*.003;fy+=cy*.003;}
+    if(aliN>0){const ax=aliX/aliN-bvx,ay=aliY/aliN-bvy;fx+=ax*.05;fy+=ay*.05;}
+    if(cohN>0){const cx=cohX/cohN-bx,cy=cohY/cohN-by;fx+=cx*.003;fy+=cy*.003;}
 
     // Mouse attraction
     if(mouseActive){
-      const dx=mx-b.x,dy=my-b.y;
+      const dx=mx-bx,dy=my-by;
       const d=Math.sqrt(dx*dx+dy*dy);
       if(d<200){fx+=dx/d*.08;fy+=dy/d*.08;}
     }
 
     // Predator avoidance
     for(const p of predators){
-      const dx=p.x-b.x,dy=p.y-b.y;
+      const dx=p.x-bx,dy=p.y-by;
       const d=Math.sqrt(dx*dx+dy*dy);
       if(d<120){fx-=dx/d*1.5;fy-=dy/d*1.5;}
     }
 
-    // Limit force
     const fMag=Math.sqrt(fx*fx+fy*fy);
     if(fMag>MAX_FORCE){fx=fx/fMag*MAX_FORCE;fy=fy/fMag*MAX_FORCE;}
 
-    b.vx+=fx;b.vy+=fy;
-    // Limit speed
-    const spd=Math.sqrt(b.vx*b.vx+b.vy*b.vy);
-    if(spd>MAX_SPEED){b.vx=b.vx/spd*MAX_SPEED;b.vy=b.vy/spd*MAX_SPEED;}
-    if(spd<1){b.vx=b.vx/spd*1;b.vy=b.vy/spd*1;} // minimum speed
+    jsVx[i]+=fx;jsVy[i]+=fy;
+    const spd=Math.sqrt(jsVx[i]*jsVx[i]+jsVy[i]*jsVy[i]);
+    if(spd>MAX_SPEED){jsVx[i]=jsVx[i]/spd*MAX_SPEED;jsVy[i]=jsVy[i]/spd*MAX_SPEED;}
+    if(spd<1){jsVx[i]=jsVx[i]/spd;jsVy[i]=jsVy[i]/spd;}
 
-    b.x+=b.vx;b.y+=b.vy;
-    // Wrap
-    if(b.x<0)b.x=W;if(b.x>W)b.x=0;if(b.y<0)b.y=H;if(b.y>H)b.y=0;
-    // Trail
-    if(showTrails){b.trail.push({x:b.x,y:b.y});if(b.trail.length>15)b.trail.shift();}
+    jsPx[i]+=jsVx[i];jsPy[i]+=jsVy[i];
+    if(jsPx[i]<0)jsPx[i]=W;if(jsPx[i]>W)jsPx[i]=0;
+    if(jsPy[i]<0)jsPy[i]=H;if(jsPy[i]>H)jsPy[i]=0;
   }
-  // Update predators — chase nearest boid
+}
+
+// === PREDATOR PHYSICS (always JS) ===
+function stepPredators(){
   for(const p of predators){
+    const px=wasmReady?wasmPx:jsPx;
+    const py=wasmReady?wasmPy:jsPy;
     let nearX=0,nearY=0,nearD=Infinity;
-    for(const b of boids){
-      const d=(b.x-p.x)**2+(b.y-p.y)**2;
-      if(d<nearD){nearD=d;nearX=b.x;nearY=b.y;}
+    for(let i=0;i<boidCount;i++){
+      const d=(px[i]-p.x)**2+(py[i]-p.y)**2;
+      if(d<nearD){nearD=d;nearX=px[i];nearY=py[i];}
     }
     if(nearD<Infinity){
       const dx=nearX-p.x,dy=nearY-p.y;
@@ -158,36 +257,94 @@ function updateBoids(){
   }
 }
 
+// === PREDATOR AVOIDANCE for WASM boids (apply as attractor hack) ===
+// WASM only has a single attractor. We combine mouse + predator repulsion
+// by computing a net force on each boid in JS after WASM step, nudging velocities.
+function applyPredatorAvoidanceWasm(){
+  if(predators.length===0)return;
+  for(let i=0;i<boidCount;i++){
+    let fx=0,fy=0;
+    for(const p of predators){
+      const dx=p.x-wasmPx[i],dy=p.y-wasmPy[i];
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<120){fx-=dx/d*1.5;fy-=dy/d*1.5;}
+    }
+    if(fx!==0||fy!==0){
+      const fMag=Math.sqrt(fx*fx+fy*fy);
+      if(fMag>MAX_FORCE){fx=fx/fMag*MAX_FORCE;fy=fy/fMag*MAX_FORCE;}
+      wasmVx[i]+=fx;wasmVy[i]+=fy;
+      const spd=Math.sqrt(wasmVx[i]*wasmVx[i]+wasmVy[i]*wasmVy[i]);
+      if(spd>MAX_SPEED){wasmVx[i]=wasmVx[i]/spd*MAX_SPEED;wasmVy[i]=wasmVy[i]/spd*MAX_SPEED;}
+    }
+  }
+}
+
 // === RENDER ===
 function anim(){requestAnimationFrame(anim);
   X.fillStyle='rgba(3,3,16,.1)';X.fillRect(0,0,W,H);
-  updateBoids();
 
-  // Draw boid trails
+  const px=wasmReady?wasmPx:jsPx;
+  const py=wasmReady?wasmPy:jsPy;
+  const vx=wasmReady?wasmVx:jsVx;
+  const vy=wasmReady?wasmVy:jsVy;
+
+  // === PHYSICS STEP ===
+  if(wasmReady){
+    // Set mouse attractor
+    if(mouseActive){
+      wasmExports.boids_set_attractor(mx,my,0.08);
+    }else{
+      wasmExports.boids_set_attractor(0,0,0);
+    }
+    wasmExports.boids_step(1.0);
+    applyPredatorAvoidanceWasm();
+  }else{
+    stepPhysicsJS();
+  }
+
+  stepPredators();
+
+  // === UPDATE TRAILS ===
   if(showTrails){
-    for(const b of boids){
-      if(b.trail.length<2)continue;
-      X.strokeStyle=COLORS[b.species%COLORS.length];X.lineWidth=.5;X.globalAlpha=.04;
+    for(let i=0;i<boidCount;i++){
+      const head=trailHead[i];
+      const base=i*TRAIL_LEN;
+      trailX[base+head]=px[i];
+      trailY[base+head]=py[i];
+      trailHead[i]=(head+1)%TRAIL_LEN;
+    }
+  }
+
+  // === DRAW TRAILS ===
+  if(showTrails){
+    for(let i=0;i<boidCount;i++){
+      const sp=boidSpecies[i]|0;
+      const base=i*TRAIL_LEN;
+      const head=trailHead[i];
+      X.strokeStyle=COLORS[sp%COLORS.length];X.lineWidth=.5;X.globalAlpha=.04;
       X.beginPath();
-      for(let i=0;i<b.trail.length;i++){
-        i===0?X.moveTo(b.trail[i].x,b.trail[i].y):X.lineTo(b.trail[i].x,b.trail[i].y);
+      for(let t=0;t<TRAIL_LEN;t++){
+        const idx=base+((head+t)%TRAIL_LEN);
+        t===0?X.moveTo(trailX[idx],trailY[idx]):X.lineTo(trailX[idx],trailY[idx]);
       }
       X.stroke();
     }
   }
 
-  // Draw boids as triangles pointing in velocity direction
-  for(const b of boids){
-    const angle=Math.atan2(b.vy,b.vx);
-    const spd=Math.sqrt(b.vx*b.vx+b.vy*b.vy);
+  // === DRAW BOIDS ===
+  for(let i=0;i<boidCount;i++){
+    const bvx=vx[i],bvy=vy[i];
+    const angle=Math.atan2(bvy,bvx);
+    const spd=Math.sqrt(bvx*bvx+bvy*bvy);
     const sz=3+spd*.5;
-    X.globalAlpha=.5;X.fillStyle=COLORS[b.species%COLORS.length];
-    X.save();X.translate(b.x,b.y);X.rotate(angle);
+    const sp=boidSpecies[i]|0;
+    X.globalAlpha=.5;X.fillStyle=COLORS[sp%COLORS.length];
+    X.save();X.translate(px[i],py[i]);X.rotate(angle);
     X.beginPath();X.moveTo(sz,0);X.lineTo(-sz*.5,-sz*.4);X.lineTo(-sz*.5,sz*.4);X.closePath();X.fill();
     X.restore();
   }
 
-  // Draw predators
+  // === DRAW PREDATORS ===
   for(const p of predators){
     X.globalAlpha=.4;X.fillStyle='#ff3333';
     X.beginPath();X.arc(p.x,p.y,6,0,Math.PI*2);X.fill();
@@ -195,7 +352,7 @@ function anim(){requestAnimationFrame(anim);
     X.beginPath();X.arc(p.x,p.y,120,0,Math.PI*2);X.stroke();
   }
 
-  // Mouse cursor
+  // === MOUSE CURSOR ===
   if(mouseActive){
     X.globalAlpha=.06;X.fillStyle='#88ccff';
     X.beginPath();X.arc(mx,my,8,0,Math.PI*2);X.fill();
@@ -205,9 +362,11 @@ function anim(){requestAnimationFrame(anim);
 
   X.globalAlpha=1;
   document.getElementById('stats').textContent=
-    'boids: '+boids.length+'\npredators: '+predators.length+'\nspecies: '+numSpecies;
+    'boids: '+boidCount+(wasmReady?' (WASM)':' (JS)')+'\npredators: '+predators.length+'\nspecies: '+numSpecies;
 }
-anim();
+
+// Start after WASM init attempt
+initWasm().then(()=>anim());
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="flocking.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>

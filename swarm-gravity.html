@@ -29,22 +29,87 @@ const C=document.getElementById('c'),X=C.getContext('2d');
 let W,H;function resize(){W=C.width=innerWidth;H=C.height=innerHeight;}
 resize();addEventListener('resize',resize);
 
-// === BOIDS ===
-const boids=[];
+// === CONSTANTS ===
+const MAX_BOIDS=10000;
+const TRAIL_LEN=12;
+const INITIAL_COUNT=1000;
+
+// === STATE ===
 const wells=[];
 let captured=0;
+let useWasm=false;
+let boidCount=0;
 
-class Boid{
-  constructor(x,y){
-    this.x=x||Math.random()*W;this.y=y||Math.random()*H;
-    this.vx=(Math.random()-.5)*3;this.vy=(Math.random()-.5)*3;
-    this.alive=true;this.trail=[];this.hue=200+Math.random()*40;
-    this.panic=0; // increases near wells
+// WASM exports and typed array views
+let wasm=null;
+let wasmPx,wasmPy,wasmVx,wasmVy,wasmType;
+
+// Per-boid JS rendering state (parallel arrays)
+const hueArr=new Float32Array(MAX_BOIDS);
+const panicArr=new Float32Array(MAX_BOIDS);
+const aliveArr=new Uint8Array(MAX_BOIDS);
+
+// Trail ring buffers: each boid gets TRAIL_LEN slots
+const trailX=new Float32Array(MAX_BOIDS*TRAIL_LEN);
+const trailY=new Float32Array(MAX_BOIDS*TRAIL_LEN);
+const trailHead=new Uint16Array(MAX_BOIDS); // current write index per boid
+const trailCount=new Uint16Array(MAX_BOIDS); // how many valid entries per boid
+
+// === JS FALLBACK PHYSICS (SoA) ===
+let jsPx,jsPy,jsVx,jsVy;
+function initJsArrays(){
+  jsPx=new Float32Array(MAX_BOIDS);jsPy=new Float32Array(MAX_BOIDS);
+  jsVx=new Float32Array(MAX_BOIDS);jsVy=new Float32Array(MAX_BOIDS);
+}
+
+function addBoid(x,y){
+  if(boidCount>=MAX_BOIDS)return;
+  const i=boidCount;
+  const px=x!==undefined?x:Math.random()*W;
+  const py=y!==undefined?y:Math.random()*H;
+  const vx=(Math.random()-.5)*3;
+  const vy=(Math.random()-.5)*3;
+  if(useWasm){
+    wasm.boids_add(px,py,vx,vy,0);
+    boidCount=wasm.boids_get_count();
+  }else{
+    jsPx[i]=px;jsPy[i]=py;jsVx[i]=vx;jsVy[i]=vy;
+    boidCount=i+1;
+  }
+  hueArr[i]=200+Math.random()*40;
+  panicArr[i]=0;
+  aliveArr[i]=1;
+  trailHead[i]=0;trailCount[i]=0;
+}
+
+function addBoids(n){for(let i=0;i<n;i++)addBoid();}
+
+// === WASM LOADING ===
+async function initWasm(){
+  try{
+    const result=await WebAssembly.instantiateStreaming(
+      fetch('./physics.wasm'),{env:{abort:()=>{}}});
+    wasm=result.instance.exports;
+    wasm.boids_init(MAX_BOIDS,W,H);
+    wasm.boids_set_params(50,20,5,.2);
+    // Create typed array views over WASM memory
+    refreshWasmViews();
+    useWasm=true;
+  }catch(e){
+    console.warn('WASM load failed, using JS fallback:',e);
+    useWasm=false;
+    initJsArrays();
   }
 }
 
-function addBoids(n){for(let i=0;i<n;i++)boids.push(new Boid());}
-addBoids(150);
+function refreshWasmViews(){
+  const mem=wasm.memory.buffer;
+  wasmPx=new Float32Array(mem,wasm.boids_get_px_ptr(),MAX_BOIDS);
+  wasmPy=new Float32Array(mem,wasm.boids_get_py_ptr(),MAX_BOIDS);
+  wasmVx=new Float32Array(mem,wasm.boids_get_vx_ptr(),MAX_BOIDS);
+  wasmVy=new Float32Array(mem,wasm.boids_get_vy_ptr(),MAX_BOIDS);
+  wasmType=new Float32Array(mem,wasm.boids_get_type_ptr(),MAX_BOIDS);
+}
 
 // === WELLS ===
 addEventListener('click',e=>{if(e.target.closest('.btn,a'))return;
@@ -58,78 +123,137 @@ function clearWells(){wells.length=0;}
 function presetOrbit(){clearWells();wells.push({x:W/2,y:H/2,mass:120,phase:0});}
 function presetDual(){clearWells();wells.push({x:W*.35,y:H/2,mass:80,phase:0});wells.push({x:W*.65,y:H/2,mass:80,phase:Math.PI});}
 
-// === PHYSICS ===
+// === JS FALLBACK PHYSICS ===
 const PERCEPTION=50,SEP_DIST=20,MAX_SPEED=5,MAX_FORCE=.2;
 
-function update(){
-  for(let bi=boids.length-1;bi>=0;bi--){
-    const b=boids[bi];if(!b.alive)continue;
+function updateJS(dt){
+  const n=boidCount;
+  for(let bi=n-1;bi>=0;bi--){
+    if(!aliveArr[bi])continue;
+    let bx=jsPx[bi],by=jsPy[bi],bvx=jsVx[bi],bvy=jsVy[bi];
     let sepX=0,sepY=0,sepN=0;
     let aliX=0,aliY=0,aliN=0;
     let cohX=0,cohY=0,cohN=0;
-    b.panic=0;
+    let panic=0;
 
-    // Boid rules
-    for(const other of boids){
-      if(other===b||!other.alive)continue;
-      const dx=other.x-b.x,dy=other.y-b.y;
+    for(let oi=0;oi<n;oi++){
+      if(oi===bi||!aliveArr[oi])continue;
+      const dx=jsPx[oi]-bx,dy=jsPy[oi]-by;
       const d=Math.sqrt(dx*dx+dy*dy);if(d>PERCEPTION)continue;
       if(d<SEP_DIST&&d>0){sepX-=dx/d;sepY-=dy/d;sepN++;}
-      aliX+=other.vx;aliY+=other.vy;aliN++;
-      cohX+=other.x;cohY+=other.y;cohN++;
+      aliX+=jsVx[oi];aliY+=jsVy[oi];aliN++;
+      cohX+=jsPx[oi];cohY+=jsPy[oi];cohN++;
     }
 
     let fx=0,fy=0;
     if(sepN>0){fx+=sepX/sepN*1.5;fy+=sepY/sepN*1.5;}
-    if(aliN>0){fx+=(aliX/aliN-b.vx)*.05;fy+=(aliY/aliN-b.vy)*.05;}
-    if(cohN>0){fx+=(cohX/cohN-b.x)*.003;fy+=(cohY/cohN-b.y)*.003;}
+    if(aliN>0){fx+=(aliX/aliN-bvx)*.05;fy+=(aliY/aliN-bvy)*.05;}
+    if(cohN>0){fx+=(cohX/cohN-bx)*.003;fy+=(cohY/cohN-by)*.003;}
 
     // Gravity from wells
+    let dead=false;
     for(const w of wells){
-      const dx=w.x-b.x,dy=w.y-b.y;
+      const dx=w.x-bx,dy=w.y-by;
       const d2=dx*dx+dy*dy;const d=Math.sqrt(d2);
-      // Capture — too close = absorbed
-      if(d<15){b.alive=false;captured++;continue;}
+      if(d<15){dead=true;captured++;break;}
       const gForce=w.mass*20/(d2+500);
       fx+=dx/d*gForce;fy+=dy/d*gForce;
-      // Panic increases near wells
-      if(d<150)b.panic=Math.max(b.panic,1-d/150);
+      if(d<150)panic=Math.max(panic,1-d/150);
     }
-    if(!b.alive){boids.splice(bi,1);continue;}
+    if(dead){aliveArr[bi]=0;continue;}
 
-    // Panic boosts separation and speed
-    if(b.panic>.3){
-      // Try to flee — boost away from nearest well
+    if(panic>.3){
       for(const w of wells){
-        const dx=w.x-b.x,dy=w.y-b.y;
+        const dx=w.x-bx,dy=w.y-by;
         const d=Math.sqrt(dx*dx+dy*dy)||1;
-        if(d<150){fx-=dx/d*b.panic*.3;fy-=dy/d*b.panic*.3;}
+        if(d<150){fx-=dx/d*panic*.3;fy-=dy/d*panic*.3;}
       }
     }
 
     const fMag=Math.sqrt(fx*fx+fy*fy);
-    const maxF=MAX_FORCE*(1+b.panic*2);
+    const maxF=MAX_FORCE*(1+panic*2);
     if(fMag>maxF){fx=fx/fMag*maxF;fy=fy/fMag*maxF;}
 
-    b.vx+=fx;b.vy+=fy;
-    const spd=Math.sqrt(b.vx*b.vx+b.vy*b.vy);
-    const maxS=MAX_SPEED*(1+b.panic);
-    if(spd>maxS){b.vx=b.vx/spd*maxS;b.vy=b.vy/spd*maxS;}
+    bvx+=fx;bvy+=fy;
+    const spd=Math.sqrt(bvx*bvx+bvy*bvy);
+    const maxS=MAX_SPEED*(1+panic);
+    if(spd>maxS){bvx=bvx/spd*maxS;bvy=bvy/spd*maxS;}
 
-    b.x+=b.vx;b.y+=b.vy;
-    if(b.x<0)b.x=W;if(b.x>W)b.x=0;if(b.y<0)b.y=H;if(b.y>H)b.y=0;
-    b.trail.push({x:b.x,y:b.y});if(b.trail.length>12)b.trail.shift();
+    bx+=bvx;by+=bvy;
+    if(bx<0)bx=W;if(bx>W)bx=0;if(by<0)by=H;if(by>H)by=0;
+
+    jsPx[bi]=bx;jsPy[bi]=by;jsVx[bi]=bvx;jsVy[bi]=bvy;
+    panicArr[bi]=panic;
   }
 
-  // Respawn if too few
-  if(boids.length<30)for(let i=0;i<5;i++)boids.push(new Boid());
+  // Respawn if too few alive
+  let alive=0;for(let i=0;i<boidCount;i++)if(aliveArr[i])alive++;
+  if(alive<30)for(let i=0;i<5;i++)addBoid();
+}
+
+// === WASM PHYSICS ===
+function updateWasm(dt){
+  // Set attractor (first well or center if none)
+  if(wells.length>0){
+    wasm.boids_set_attractor(wells[0].x,wells[0].y,wells[0].mass);
+  }else{
+    wasm.boids_set_attractor(W/2,H/2,0);
+  }
+  wasm.boids_step(dt);
+  boidCount=wasm.boids_get_count();
+  // Refresh views in case memory grew
+  if(wasmPx.buffer!==wasm.memory.buffer)refreshWasmViews();
+
+  // Compute panic per boid from well proximity (rendering-only state)
+  const px=wasmPx,py=wasmPy;
+  for(let i=0;i<boidCount;i++){
+    let panic=0;
+    let dead=false;
+    for(const w of wells){
+      const dx=w.x-px[i],dy=w.y-py[i];
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<15){dead=true;captured++;break;}
+      if(d<150)panic=Math.max(panic,1-d/150);
+    }
+    if(dead){aliveArr[i]=0;}else{aliveArr[i]=1;}
+    panicArr[i]=panic;
+  }
+}
+
+function update(dt){
+  if(useWasm)updateWasm(dt);
+  else updateJS(dt);
+
+  // Update trails for all alive boids
+  const px=useWasm?wasmPx:jsPx;
+  const py=useWasm?wasmPy:jsPy;
+  for(let i=0;i<boidCount;i++){
+    if(!aliveArr[i])continue;
+    const off=i*TRAIL_LEN;
+    const h=trailHead[i];
+    trailX[off+h]=px[i];
+    trailY[off+h]=py[i];
+    trailHead[i]=(h+1)%TRAIL_LEN;
+    if(trailCount[i]<TRAIL_LEN)trailCount[i]++;
+  }
 }
 
 // === RENDER ===
-let time=0;
-function anim(){requestAnimationFrame(anim);time+=.016;
+let time=0,lastT=0;
+function anim(now){
+  requestAnimationFrame(anim);
+  if(!lastT)lastT=now;
+  const dt=Math.min((now-lastT)/1000,.05);
+  lastT=now;
+  time+=dt;
+
   X.fillStyle='rgba(2,2,16,.1)';X.fillRect(0,0,W,H);
-  update();
+  update(dt);
+
+  const px=useWasm?wasmPx:jsPx;
+  const py=useWasm?wasmPy:jsPy;
+  const vx=useWasm?wasmVx:jsVx;
+  const vy=useWasm?wasmVy:jsVy;
 
   // Wells
   for(const w of wells){
@@ -138,7 +262,6 @@ function anim(){requestAnimationFrame(anim);time+=.016;
     const grad=X.createRadialGradient(w.x,w.y,0,w.x,w.y,r*4);
     grad.addColorStop(0,'rgba(100,68,255,.15)');grad.addColorStop(.5,'rgba(40,20,80,.05)');grad.addColorStop(1,'rgba(0,0,0,0)');
     X.fillStyle=grad;X.globalAlpha=.5;X.beginPath();X.arc(w.x,w.y,r*4,0,Math.PI*2);X.fill();
-    // Accretion ring
     X.strokeStyle='rgba(100,68,255,.15)';X.lineWidth=1;X.globalAlpha=.2;
     X.beginPath();X.ellipse(w.x,w.y,r*2.5,r*.7,w.phase,0,Math.PI*2);X.stroke();
     X.globalAlpha=.3;X.fillStyle='rgba(150,100,255,.2)';
@@ -146,34 +269,51 @@ function anim(){requestAnimationFrame(anim);time+=.016;
   }
 
   // Boid trails
-  for(const b of boids){
-    if(b.trail.length<2)continue;
-    const color=b.panic>.3?'rgba(255,100,80,.06)':'rgba(136,200,255,.04)';
+  for(let i=0;i<boidCount;i++){
+    if(!aliveArr[i]||trailCount[i]<2)continue;
+    const off=i*TRAIL_LEN;
+    const cnt=trailCount[i];
+    const head=trailHead[i];
+    const color=panicArr[i]>.3?'rgba(255,100,80,.06)':'rgba(136,200,255,.04)';
     X.strokeStyle=color;X.lineWidth=.5;X.globalAlpha=1;
     X.beginPath();
-    for(let i=0;i<b.trail.length;i++)i===0?X.moveTo(b.trail[i].x,b.trail[i].y):X.lineTo(b.trail[i].x,b.trail[i].y);
+    // Read ring buffer from oldest to newest
+    const start=(head-cnt+TRAIL_LEN)%TRAIL_LEN;
+    for(let j=0;j<cnt;j++){
+      const idx=off+(start+j)%TRAIL_LEN;
+      if(j===0)X.moveTo(trailX[idx],trailY[idx]);
+      else X.lineTo(trailX[idx],trailY[idx]);
+    }
     X.stroke();
   }
 
   // Boids
-  for(const b of boids){
-    const angle=Math.atan2(b.vy,b.vx);
-    const spd=Math.sqrt(b.vx*b.vx+b.vy*b.vy);
+  for(let i=0;i<boidCount;i++){
+    if(!aliveArr[i])continue;
+    const bvx=vx[i],bvy=vy[i];
+    const angle=Math.atan2(bvy,bvx);
+    const spd=Math.sqrt(bvx*bvx+bvy*bvy);
     const sz=2.5+spd*.3;
-    // Color shifts with panic
-    const hue=b.panic>.3?0+b.panic*30:b.hue;
-    const sat=b.panic>.3?80:50;
-    X.globalAlpha=.5+b.panic*.3;X.fillStyle='hsl('+hue+','+sat+'%,60%)';
-    X.save();X.translate(b.x,b.y);X.rotate(angle);
+    const panic=panicArr[i];
+    const hue=panic>.3?0+panic*30:hueArr[i];
+    const sat=panic>.3?80:50;
+    X.globalAlpha=.5+panic*.3;X.fillStyle='hsl('+hue+','+sat+'%,60%)';
+    X.save();X.translate(px[i],py[i]);X.rotate(angle);
     X.beginPath();X.moveTo(sz,0);X.lineTo(-sz*.5,-sz*.4);X.lineTo(-sz*.5,sz*.4);X.closePath();X.fill();
     X.restore();
   }
 
   X.globalAlpha=1;
+  const engine=useWasm?'WASM':'JS';
   document.getElementById('stats').textContent=
-    'boids: '+boids.length+'\nwells: '+wells.length+'\ncaptured: '+captured;
+    'boids: '+boidCount+'\nwells: '+wells.length+'\ncaptured: '+captured+'\nengine: '+engine;
 }
-anim();
+
+// === INIT ===
+initWasm().then(()=>{
+  addBoids(INITIAL_COUNT);
+  requestAnimationFrame(anim);
+});
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="swarm-gravity.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>

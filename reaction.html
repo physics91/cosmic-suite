@@ -33,6 +33,20 @@ let W,H;
 const RES=2;
 let cols,rows,gridA,gridB;
 
+// === WASM ENGINE ===
+let wasm=null;
+let useWasm=false;
+
+function updateGridViews(){
+  if(useWasm){
+    const aPtr=wasm.reaction_get_a_ptr();
+    const bPtr=wasm.reaction_get_b_ptr();
+    const len=cols*rows;
+    gridA=new Float32Array(wasm.memory.buffer,aPtr,len);
+    gridB=new Float32Array(wasm.memory.buffer,bPtr,len);
+  }
+}
+
 function resize(){
   W=C.width=innerWidth;H=C.height=innerHeight;
   cols=Math.ceil(W/RES);rows=Math.ceil(H/RES);
@@ -40,11 +54,15 @@ function resize(){
 }
 
 function reset(){
-  gridA=new Float32Array(cols*rows).fill(1);
-  gridB=new Float32Array(cols*rows).fill(0);
+  if(useWasm){
+    wasm.reaction_init(cols,rows,f,k);
+    updateGridViews();
+  }else{
+    gridA=new Float32Array(cols*rows).fill(1);
+    gridB=new Float32Array(cols*rows).fill(0);
+  }
+  stepCount=0;
 }
-
-resize();addEventListener('resize',resize);
 
 // === GRAY-SCOTT REACTION-DIFFUSION ===
 // dA/dt = Da * laplacian(A) - A*B^2 + f*(1-A)
@@ -84,13 +102,18 @@ function cycleColor(){colorIdx=(colorIdx+1)%COLORS.length;document.getElementByI
 
 // === SEEDING ===
 function seedAt(cx,cy,radius){
-  for(let y=cy-radius;y<=cy+radius;y++){
-    for(let x=cx-radius;x<=cx+radius;x++){
-      const dx=x-cx,dy=y-cy;
-      if(dx*dx+dy*dy<radius*radius){
-        const wx=((x%cols)+cols)%cols;
-        const wy=((y%rows)+rows)%rows;
-        gridB[wy*cols+wx]=1;
+  if(useWasm){
+    wasm.reaction_seed(cx,cy,radius);
+    updateGridViews();
+  }else{
+    for(let y=cy-radius;y<=cy+radius;y++){
+      for(let x=cx-radius;x<=cx+radius;x++){
+        const dx=x-cx,dy=y-cy;
+        if(dx*dx+dy*dy<radius*radius){
+          const wx=((x%cols)+cols)%cols;
+          const wy=((y%rows)+rows)%rows;
+          gridB[wy*cols+wx]=1;
+        }
       }
     }
   }
@@ -106,9 +129,6 @@ function seedRandom(){
     seedAt(Math.random()*cols|0,Math.random()*rows|0,3+Math.random()*8|0);
   }
 }
-
-// Initial seed
-seedCenter();
 
 // === INPUT ===
 let painting=false;
@@ -128,9 +148,11 @@ addEventListener('keydown',e=>{
 
 // === SIMULATION ===
 let stepCount=0;
-function simulate(){
-  const nextA=new Float32Array(cols*rows);
-  const nextB=new Float32Array(cols*rows);
+
+function simulateJS(){
+  const len=cols*rows;
+  const nextA=new Float32Array(len);
+  const nextB=new Float32Array(len);
 
   for(let y=1;y<rows-1;y++){
     for(let x=1;x<cols-1;x++){
@@ -148,6 +170,21 @@ function simulate(){
     }
   }
   gridA=nextA;gridB=nextB;stepCount++;
+}
+
+function simulateWasm(steps){
+  wasm.reaction_set_params(f,k,Da,Db);
+  wasm.reaction_step(steps);
+  updateGridViews();
+  stepCount+=steps;
+}
+
+function simulate(steps){
+  if(useWasm){
+    simulateWasm(steps);
+  }else{
+    for(let i=0;i<steps;i++)simulateJS();
+  }
 }
 
 // === RENDER ===
@@ -171,17 +208,41 @@ function render(){
   X.imageSmoothingEnabled=true;
   X.drawImage(offC,0,0,cols,rows,0,0,W,H);
 
+  const engine=useWasm?'WASM':'JS';
   document.getElementById('stats').textContent=
-    'step: '+stepCount+'\nf: '+f.toFixed(4)+' k: '+k.toFixed(4)+'\nres: '+cols+'x'+rows;
+    'engine: '+engine+'\nstep: '+stepCount+'\nf: '+f.toFixed(4)+' k: '+k.toFixed(4)+'\nres: '+cols+'x'+rows;
 }
 
 function anim(){
   requestAnimationFrame(anim);
   // Multiple steps per frame for speed
-  for(let i=0;i<8;i++)simulate();
+  simulate(8);
   render();
 }
-anim();
+
+// === WASM INIT ===
+async function initWasm(){
+  try{
+    const result=await WebAssembly.instantiateStreaming(
+      fetch('./physics.wasm'),
+      {env:{abort:()=>{}}}
+    );
+    wasm=result.instance.exports;
+    useWasm=true;
+    console.log('[reaction] WASM engine loaded');
+  }catch(e){
+    console.warn('[reaction] WASM load failed, using JS fallback:',e);
+    useWasm=false;
+  }
+}
+
+// === BOOT ===
+initWasm().then(()=>{
+  resize();
+  addEventListener('resize',resize);
+  seedCenter();
+  anim();
+});
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="reaction.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>

@@ -10,7 +10,7 @@
     body{background:#020208;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;cursor:crosshair}
     canvas{display:block}
     #info{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.12);font-size:9px;letter-spacing:3px;z-index:2;pointer-events:none}
-    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8}
+    #stats{position:fixed;bottom:16px;left:16px;color:rgba(255,255,255,.08);font-size:8px;z-index:2;pointer-events:none;font-family:monospace;line-height:1.8;white-space:pre}
     .btn{position:fixed;z-index:20;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);padding:4px 10px;border-radius:8px;cursor:pointer;font-size:9px;letter-spacing:1px}
     .btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
     .btn.active{background:rgba(68,255,136,.1);border-color:rgba(68,255,136,.3)}
@@ -32,20 +32,46 @@ let W,H;
 const CELL=4;
 let cols,rows,grid,glow;
 let running=true,gen=0,population=0,gravityMode=0;
+let useWasm=false, wasm=null, wasmMemory=null;
 
 const GRAVITY_MODES=['Normal','Heavy','None','Reverse'];
 
+// === WASM ENGINE ===
+async function initWasm(){
+  try{
+    const result=await WebAssembly.instantiateStreaming(fetch('./physics.wasm'),{env:{abort:()=>{}}});
+    wasm=result.instance.exports;
+    wasmMemory=wasm.memory;
+    useWasm=true;
+    console.log('WASM physics engine loaded');
+  }catch(e){
+    console.warn('WASM load failed, using JS fallback:',e);
+    useWasm=false;
+  }
+}
+
 function resize(){
   W=C.width=innerWidth;H=C.height=innerHeight;
-  cols=Math.ceil(W/CELL);rows=Math.ceil(H/CELL);
-  grid=new Uint8Array(cols*rows);
-  glow=new Float32Array(cols*rows);
+  const newCols=Math.ceil(W/CELL),newRows=Math.ceil(H/CELL);
+  if(newCols===cols&&newRows===rows)return;
+  cols=newCols;rows=newRows;
+
+  if(useWasm){
+    // ruleSet 1 = gravity-life
+    wasm.cellular_init(cols,rows,1);
+    // Create views into WASM memory
+    grid=new Uint8Array(wasmMemory.buffer,wasm.cellular_get_grid_ptr(),cols*rows);
+    glow=new Float32Array(wasmMemory.buffer,wasm.cellular_get_glow_ptr(),cols*rows);
+  }else{
+    grid=new Uint8Array(cols*rows);
+    glow=new Float32Array(cols*rows);
+  }
 }
-resize();addEventListener('resize',resize);
 
 function idx(x,y){return((y%rows)+rows)%rows*cols+((x%cols)+cols)%cols;}
 
-function step(){
+// === JS FALLBACK STEP ===
+function stepJS(){
   const next=new Uint8Array(cols*rows);
   population=0;
 
@@ -73,7 +99,6 @@ function step(){
   const gStr=gravityMode===0?1:gravityMode===1?3:gravityMode===3?-1:0;
 
   if(gStr!==0){
-    // Process bottom-up for downward gravity, top-down for reverse
     const startY=gStr>0?rows-2:1;
     const endY=gStr>0?-1:rows;
     const stepY=gStr>0?-1:1;
@@ -82,7 +107,6 @@ function step(){
       for(let x=0;x<cols;x++){
         const i=y*cols+x;
         if(!next[i])continue;
-        // Try to fall
         const below=y+gStr;
         if(below>=0&&below<rows){
           const bi=below*cols+x;
@@ -95,16 +119,51 @@ function step(){
     }
   }
 
-  // Count population
   for(let i=0;i<cols*rows;i++)if(next[i])population++;
   grid=next;gen++;
 }
 
-function clear_(){grid.fill(0);glow.fill(0);gen=0;}
+// === WASM STEP ===
+function stepWasm(){
+  wasm.cellular_step(1);
+  // Refresh memory views (buffer may have grown)
+  grid=new Uint8Array(wasmMemory.buffer,wasm.cellular_get_grid_ptr(),cols*rows);
+  glow=new Float32Array(wasmMemory.buffer,wasm.cellular_get_glow_ptr(),cols*rows);
+  gen++;
+  // Count population from grid
+  population=0;
+  for(let i=0;i<cols*rows;i++)if(grid[i])population++;
+}
+
+function step(){
+  if(useWasm){stepWasm();}else{stepJS();}
+}
+
+function clear_(){
+  if(useWasm){
+    wasm.cellular_clear();
+    grid=new Uint8Array(wasmMemory.buffer,wasm.cellular_get_grid_ptr(),cols*rows);
+    glow=new Float32Array(wasmMemory.buffer,wasm.cellular_get_glow_ptr(),cols*rows);
+  }else{
+    grid.fill(0);glow.fill(0);
+  }
+  gen=0;
+}
+
 function cycleGravity(){gravityMode=(gravityMode+1)%GRAVITY_MODES.length;document.getElementById('gV').textContent=GRAVITY_MODES[gravityMode];}
+
 function rain(){
   for(let x=0;x<cols;x++){
-    if(Math.random()<.3)grid[x]=1;
+    if(Math.random()<.3){
+      if(useWasm){
+        wasm.cellular_set(x,0,1);
+      }else{
+        grid[x]=1;
+      }
+    }
+  }
+  if(useWasm){
+    grid=new Uint8Array(wasmMemory.buffer,wasm.cellular_get_grid_ptr(),cols*rows);
   }
 }
 
@@ -120,7 +179,18 @@ C.addEventListener('touchend',()=>{painting=false;});
 function paint(mx,my){
   const cx=Math.floor(mx/CELL),cy=Math.floor(my/CELL);
   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-    if(Math.random()<.7){const i=idx(cx+dx,cy+dy);grid[i]=1;glow[i]=1;}
+    if(Math.random()<.7){
+      const x=((cx+dx)%cols+cols)%cols, y=((cy+dy)%rows+rows)%rows;
+      if(useWasm){
+        wasm.cellular_set(x,y,1);
+      }else{
+        const i=idx(cx+dx,cy+dy);grid[i]=1;glow[i]=1;
+      }
+    }
+  }
+  if(useWasm){
+    grid=new Uint8Array(wasmMemory.buffer,wasm.cellular_get_grid_ptr(),cols*rows);
+    glow=new Float32Array(wasmMemory.buffer,wasm.cellular_get_glow_ptr(),cols*rows);
   }
 }
 
@@ -132,16 +202,16 @@ addEventListener('keydown',e=>{
   if(e.key==='f')document.documentElement.requestFullscreen().catch(()=>{});
 });
 
-// Seed initial
-rain();
-
 // === RENDER ===
 let imgData=null;
 const offC=document.createElement('canvas');
 const offX=offC.getContext('2d');
 
 function render(){
-  for(let i=0;i<glow.length;i++)if(glow[i]>0)glow[i]*=.9;
+  // Decay glow (JS-side for both modes since we read glow for rendering)
+  if(!useWasm){
+    for(let i=0;i<glow.length;i++)if(glow[i]>0)glow[i]*=.9;
+  }
 
   offC.width=cols;offC.height=rows;
   if(!imgData||imgData.width!==cols)imgData=new ImageData(cols,rows);
@@ -165,8 +235,9 @@ function render(){
   X.imageSmoothingEnabled=false;
   X.drawImage(offC,0,0,cols,rows,0,0,W,H);
 
+  const engine=useWasm?'WASM':'JS';
   document.getElementById('stats').textContent=
-    'gen: '+gen+'\npop: '+population+'\ngravity: '+GRAVITY_MODES[gravityMode];
+    'gen: '+gen+'\npop: '+population+'\ngravity: '+GRAVITY_MODES[gravityMode]+'\nengine: '+engine;
 }
 
 function anim(){
@@ -174,7 +245,14 @@ function anim(){
   if(running)step();
   render();
 }
-anim();
+
+// === BOOT ===
+initWasm().then(()=>{
+  resize();
+  addEventListener('resize',resize);
+  rain();
+  anim();
+});
 </script>
 <script>try{const _pc=new BroadcastChannel("cosmic-pulse");const _pn="gravity-life.html";setInterval(()=>_pc.postMessage({type:"pulse",href:_pn}),1000);}catch(e){}</script>
 </body>
