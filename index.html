@@ -288,6 +288,7 @@
   <div><span class="l">age</span><span class="v" id="hAge">0s</span></div>
   <div><span class="l">mode</span><span class="v" id="hMode">attract</span></div>
   <div><span class="l">fps</span><span class="v" id="hFps">0</span></div>
+  <div><span class="l">engine</span><span class="v" id="hEngine">JS</span></div>
 </div>
 <div id="topR">
   <div style="display:flex;gap:6px;align-items:center">time <input type="range" id="tSlider" min="0" max="300" value="100"><span id="tVal">1.0x</span></div>
@@ -623,12 +624,98 @@
 <a href="portal.html" style="position:fixed;top:12px;left:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">&larr; suite</a><a id="random-jump" href="#" onclick="const e=['art.html','attractor.html','automata.html','beats.html','breathe.html','cellular-music.html','chat.html','clock.html','conway.html','dice.html','entropy.html','fourier.html','gravity-beats.html','gravity-well.html','harmonograph.html','index.html','interference.html','life.html','living-mandala.html','mandala.html','memory.html','music.html','neural.html','oracle.html','orbit.html','pendulum.html','puzzle.html','racer.html','reaction.html','rhythm.html','sandbox.html','scale.html','sonic-terrain.html','tarot.html','terrain.html','topology.html','type.html','words.html'];location.href=e[Math.random()*e.length|0];return false" style="position:fixed;top:12px;right:12px;color:rgba(255,255,255,.15);font-size:9px;text-decoration:none;z-index:99;letter-spacing:1px">random &rarr;</a>
 <canvas id="canvas" role="img" aria-label="Interactive universe simulation canvas"></canvas>
 <script>
-(()=>{
+(async()=>{
 const C=document.getElementById('canvas'),X=C.getContext('2d');
 const mC=document.getElementById('minimap'),mX=mC.getContext('2d');
 const bC=document.getElementById('bloomCanvas'),bX=bC.getContext('2d');
 const spC=document.getElementById('spectrumBar'),spX=spC.getContext('2d');
 let W,H,simTime=0;
+
+// ═══ WASM PHYSICS ENGINE ═══
+let wasmReady=false,wasmExports=null,wasmMemory=null;
+let wasmPx=null,wasmPy=null,wasmVx=null,wasmVy=null,wasmMass=null;
+const WASM_MAX=15000;
+
+async function initWasm(){
+  try{
+    const {instance}=await WebAssembly.instantiateStreaming(fetch('./physics.wasm'),{env:{abort:()=>{}}});
+    wasmExports=instance.exports;wasmMemory=wasmExports.memory;
+    wasmExports.nbody_init(WASM_MAX,4000,4000);
+    wasmExports.nbody_set_params(0.08,4,0.9988,0);
+    rebindWasmViews();
+    wasmReady=true;
+    console.log('[WASM] physics engine loaded — max particles:',WASM_MAX);
+  }catch(e){console.warn('[WASM] unavailable, using JS fallback:',e);wasmReady=false;}
+}
+
+function rebindWasmViews(){
+  if(!wasmExports)return;
+  const buf=wasmMemory.buffer;
+  wasmPx=new Float64Array(buf,wasmExports.nbody_get_px_ptr(),WASM_MAX);
+  wasmPy=new Float64Array(buf,wasmExports.nbody_get_py_ptr(),WASM_MAX);
+  wasmVx=new Float64Array(buf,wasmExports.nbody_get_vx_ptr(),WASM_MAX);
+  wasmVy=new Float64Array(buf,wasmExports.nbody_get_vy_ptr(),WASM_MAX);
+  wasmMass=new Float64Array(buf,wasmExports.nbody_get_mass_ptr(),WASM_MAX);
+}
+
+function syncToWasm(){
+  if(!wasmReady)return;
+  // Rebind views in case memory grew
+  if(wasmMemory.buffer!==wasmPx.buffer)rebindWasmViews();
+  // Clear WASM particles and re-add from JS P[] array
+  const count=wasmExports.nbody_get_count();
+  // Fast path: write directly into WASM memory
+  // First, ensure WASM has exactly P.length particles
+  // Remove excess
+  while(wasmExports.nbody_get_count()>P.length){
+    wasmExports.nbody_remove(wasmExports.nbody_get_count()-1);
+  }
+  // Add missing
+  while(wasmExports.nbody_get_count()<P.length){
+    wasmExports.nbody_add(0,0,0,0,1);
+  }
+  // Rebind in case adds caused memory growth
+  if(wasmMemory.buffer!==wasmPx.buffer)rebindWasmViews();
+  // Copy positions/velocities/masses
+  for(let i=0;i<P.length;i++){
+    const p=P[i];
+    wasmPx[i]=p.x;wasmPy[i]=p.y;
+    wasmVx[i]=p.vx;wasmVy[i]=p.vy;
+    wasmMass[i]=p.mass;
+  }
+}
+
+function syncFromWasm(){
+  if(!wasmReady)return;
+  if(wasmMemory.buffer!==wasmPx.buffer)rebindWasmViews();
+  for(let i=0;i<P.length;i++){
+    const p=P[i];
+    p.vx=wasmVx[i];p.vy=wasmVy[i];
+    // Position update is done by WASM nbody_step, but Star.update() also moves
+    // So we only take velocity changes from WASM (gravity), not position
+  }
+}
+
+function wasmNBody(dt){
+  if(!fNbody)return;
+  if(!wasmReady){nBodyJS(dt);return;}
+  // Sync params in case user changed gravity
+  wasmExports.nbody_set_params(phys.G,4,0.9988,0);
+  // Add black holes as attractors
+  wasmExports.nbody_clear_attractors();
+  for(const bh of BH){
+    wasmExports.nbody_add_attractor(bh.x,bh.y,bh.mass);
+  }
+  // Mouse attractor
+  if(ms.d&&(mode==='attract'||mode==='repel'||mode==='orbit')){
+    const mMass=mode==='repel'?-500:500;
+    wasmExports.nbody_add_attractor(ms.wx,ms.wy,mMass);
+  }
+  syncToWasm();
+  wasmExports.nbody_step(dt);
+  syncFromWasm();
+  wasmExports.nbody_clear_attractors();
+}
 
 // ═══ CAMERA ═══
 const cam={x:0,y:0,z:1,tz:1,px:0,py:0,pan:false};
@@ -722,6 +809,7 @@ let tScale=1,shake=0,fusN=0;
 let P=[],NB=[],BH=[],WH=[],CO=[],PU=[],PL=[],BG=[],SW=[],GW=[],FF=[];
 let whEntry=null;
 let MX=5000;const GS=80;let grid={};
+function upgradeMaxParticles(){if(wasmReady)MX=WASM_MAX;}
 
 // ═══ GRID ═══
 function bGrid(){grid={};for(const p of P){const k=`${(p.x/GS)|0},${(p.y/GS)|0}`;(grid[k]||(grid[k]=[])).push(p);}}
@@ -924,12 +1012,13 @@ function applyMicForce(dt){if(!micOn||!micData)return;micAn.getByteFrequencyData
   if(high>.5&&Math.random()<high*.2&&P.length<MX){P.push(new Star(Math.random()*W,Math.random()*H,0,0,{life:30+high*60,sz:.3+high,col:'#fff',cl:CL[5]}));}}
 
 // ═══ N-BODY ═══
-function nBody(dt){if(!fNbody)return;const G=phys.G;
+function nBodyJS(dt){if(!fNbody)return;const G=phys.G;
   // Performance: skip N-body when too many particles
   const skip=P.length>1000?4:P.length>500?2:1;
   for(let i=0;i<P.length;i+=skip){const p=P[i];const nb=gNb(p.x,p.y);let ax=0,ay=0;
     for(let j=0;j<nb.length;j++){const q=nb[j];if(q===p)continue;const dx=q.x-p.x,dy=q.y-p.y,ds=dx*dx+dy*dy;if(ds<4)continue;const d=Math.sqrt(ds);const f=G*q.mass/ds;ax+=(dx/d)*f;ay+=(dy/d)*f;}
     p.vx+=ax*dt;p.vy+=ay*dt;}}
+function nBody(dt){wasmNBody(dt);}
 
 // ═══ FUSION ═══
 function checkFusion(){const ck=new Set();for(let i=P.length-1;i>=0;i--){const p=P[i];if(p.life<=0||p.fcd>0||p.sz<1.5)continue;const nb=gNb(p.x,p.y);for(const q of nb){if(q===p||q.life<=0||q.fcd>0||q.sz<1.5||ck.has(q))continue;const dx=p.x-q.x,dy=p.y-q.y;if(dx*dx+dy*dy<(p.sz+q.sz)*.8*(p.sz+q.sz)*.8){const[bg,sm]=p.sz>=q.sz?[p,q]:[q,p];const ns=Math.min(5,Math.sqrt(bg.sz*bg.sz+sm.sz*sm.sz));bg.sz=ns;bg.mass=ns*2;bg.vx=(bg.vx*bg.mass+sm.vx*sm.mass)/(bg.mass+sm.mass);bg.vy=(bg.vy*bg.mass+sm.vy*sm.mass)/(bg.mass+sm.mass);bg.life=Math.min(bg.life+200,bg.mxL);bg.fcd=30;if(ns>3.5){bg.col='#ff8844';bg.gf=8;}else if(ns>2.5){bg.col='#aaccff';bg.gf=6;}sm.life=-1;FF.push(new Flash(bg.x,bg.y,ns));GW.push(new GravWave(bg.x,bg.y));fusN++;snd('fusion');logEvt('STELLAR FUSION');break;}}ck.add(p);}}
@@ -4352,7 +4441,7 @@ function updateStats(){
   peakStars=Math.max(peakStars,P.length);
   const el=$('stats');
   const age=simTime/60|0;const min=age/60|0;const sec=age%60;
-  el.textContent='peak '+peakStars+' | born '+totalStarsCreated+' | died '+totalDeaths+'\n'+Object.keys(achievements).length+'/'+ACH_DEFS.length+' achievements | '+(min?min+'m ':'')+sec+'s';}
+  el.textContent='peak '+peakStars+' | born '+totalStarsCreated+' | died '+totalDeaths+(wasmReady?' (WASM)':'')+'\n'+Object.keys(achievements).length+'/'+ACH_DEFS.length+' achievements | '+(min?min+'m ':'')+sec+'s';}
 
 // ═══ PROCEDURAL BACKGROUND NEBULA ═══
 // Simple value noise for beautiful nebula patterns
@@ -4547,7 +4636,7 @@ function checkFinalNarration(dt){
 let lt=performance.now(),fpF=0,fpT=0;
 function anim(now){requestAnimationFrame(anim);const rDt=(now-lt)/16.67;lt=now;updateDream(now);if(paused){updateTitleBar();renderPhotoOverlay();return;}const dt=Math.min(rDt,3)*tScale;simTime+=dt;
   cam.z+=(cam.tz-cam.z)*.1;updateSmoothCam();$('zVal').textContent=cam.z.toFixed(1)+'x';
-  fpF++;fpT+=rDt*16.67;if(fpT>=1e3){$('hFps').textContent=fpF;fpF=0;fpT=0;}
+  fpF++;fpT+=rDt*16.67;if(fpT>=1e3){$('hFps').textContent=fpF;$('hEngine').textContent=wasmReady?'WASM':'JS';fpF=0;fpT=0;}
   let sx=0,sy=0;if(shake>0){sx=(Math.random()-.5)*shake;sy=(Math.random()-.5)*shake;shake*=.91;if(shake<.4)shake=0;}
   X.save();X.translate(sx,sy);X.translate(W/2,H/2);X.scale(cam.z,cam.z);X.translate(-cam.x-W/2,-cam.y-H/2);
   const[br,bg,bb]=th.bg;X.fillStyle=`rgba(${br},${bg},${bb},${fExpo?.008:.1})`;X.fillRect(cam.x-W,cam.y-H,W*3,H*3);
@@ -4670,7 +4759,9 @@ function anim(now){requestAnimationFrame(anim);const rDt=(now-lt)/16.67;lt=now;u
   updA(now);updateWind();}
 
 function resize(){W=C.width=window.innerWidth;H=C.height=window.innerHeight;bC.width=W/2;bC.height=H/2;bC.style.width=W+'px';bC.style.height=H+'px';bC.style.display=fBloom?'block':'none';BG.length=0;for(let i=0;i<500;i++)BG.push({x:Math.random()*W*2,y:Math.random()*H*2,s:Math.random()*1.5,p:Math.random()*Math.PI*2,layer:Math.random()<.6?0:Math.random()<.7?1:2});initDust();}
-resize();initFgDust();initNebulaCanvas();applyUrlParams();window.addEventListener('resize',()=>{resize();initFgDust();initNebulaCanvas();if(fPaint)initPaintCanvas();});loadLegacy();requestAnimationFrame(anim);
+resize();initFgDust();initNebulaCanvas();applyUrlParams();window.addEventListener('resize',()=>{resize();initFgDust();initNebulaCanvas();if(fPaint)initPaintCanvas();});loadLegacy();
+// Init WASM then start animation
+await initWasm();upgradeMaxParticles();requestAnimationFrame(anim);
 // Don't auto-bigBang — wait for welcome click
 })();
 </script>
