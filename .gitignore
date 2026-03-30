@@ -1,3 +1,4 @@
 *.png
 .claude/
 .playwright-mcp/
+.worktrees/
