@@ -2,3 +2,5 @@
 .claude/
 .playwright-mcp/
 .worktrees/
+engine/node_modules/
+engine/build/

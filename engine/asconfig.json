@@ -1,0 +1,19 @@
+{
+  "targets": {
+    "debug": {
+      "outFile": "build/physics.debug.wasm",
+      "debug": true,
+      "runtime": "stub"
+    },
+    "release": {
+      "outFile": "build/physics.wasm",
+      "optimizeLevel": 3,
+      "shrinkLevel": 1,
+      "runtime": "stub",
+      "noAssert": true
+    }
+  },
+  "options": {
+    "bindings": "raw"
+  }
+}

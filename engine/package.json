@@ -1,0 +1,13 @@
+{
+  "name": "cosmic-physics-engine",
+  "version": "1.0.0",
+  "description": "Shared WASM physics engine for the Cosmic Suite",
+  "scripts": {
+    "build": "asc assembly/index.ts --outFile build/physics.wasm --optimize --runtime stub && cp build/physics.wasm ../physics.wasm",
+    "build:debug": "asc assembly/index.ts --outFile build/physics.debug.wasm --debug --runtime stub",
+    "build:text": "asc assembly/index.ts --outFile build/physics.wat --optimize --runtime stub --textFile build/physics.wat"
+  },
+  "devDependencies": {
+    "assemblyscript": "^0.27.0"
+  }
+}
